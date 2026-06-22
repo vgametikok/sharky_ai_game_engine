@@ -42,8 +42,16 @@ node build.js --all               # собрать все конфиги из ga
 ```
 
 Предпросмотр: запущен `launch.json`-профиль **game-engine** (node tools/serve.js на :5050,
-корень — dist/, индекс — match3-medieval.html). Открой `http://localhost:5050/`.
+корень — dist/, индекс — match3-medieval.html). Открой `http://localhost:5050/` или
+конкретную игру — `http://localhost:5050/<name>.html`.
 Вне Sharky игра автостартует через 400 мс (флаг `gotShell`).
+
+Текущие игры:
+- `match3-medieval` — классический match-3 (первая, эталон механики).
+- `hungry-kitchen` — режим цель/раунды: собери 12 шт. блюда-задания за 60 c, пройди уровень,
+  получи новый набор еды и новую цель. Поле 7×7, доска-подложка, фон-кухня.
+  Ассеты пакуются `tools/pack-kitchen-config.ps1` → `games/hungry-kitchen.assets.js`,
+  подписи/правила — в `games/hungry-kitchen.config.js`.
 
 ## Как сгенерировать новую игру того же жанра (дёшево)
 
@@ -83,12 +91,35 @@ node build.js --all               # собрать все конфиги из ga
 | `pointerUp(e)` | `e = {x, y, downX, downY, dx, dy, dist, dir}` |
 | `pointerMove(p)` | `p = {x, y}` |
 | `key(k)` | `k = event.key` |
+| `hud(ctx)` | если определён — рисует СВОЙ HUD вместо стандартного (счёт+таймер) |
 
 ### API ядра (`engine.*`)
 
-`ctx, W, H, headerH, cfg, theme, rules, score` (чтение) ·
+`ctx, W, H, headerH, cfg, theme, rules, score, timeLeft, duration` (чтение) ·
 `img(name)` · `beep(freq,dur,type,vol)` · `burst(x,y,opts)` ·
-`addScore(n)` / `setScore(v)` · `gameOver()` · `rr(x,y,w,h,r)` · `accent()`
+`addScore(n)` / `setScore(v)` · `gameOver()` · `resetTimer(sec?)` (сброс таймера раунда) ·
+`rr(x,y,w,h,r)` · `accent()`
+
+Отладка/тесты (не для прода-логики): `Engine.debug()` — состояние ядра; `Engine._scene` —
+текущая сцена; у match3 есть `scene._state()` — снимок поля/счётчиков, чтобы гонять
+логику вручную через `update(dt)` без `requestAnimationFrame`.
+
+### Темы и ассеты
+
+- `theme.bgImage` — имя ассета-фона: рисуется по ширине экрана, верх закреплён, низ обрезается.
+- `theme.hudIcon`, `theme.hudText`, `theme.accent`, `theme.bgTop/bgBottom`, `theme.font`, `theme.labels`.
+- Ассеты в `assets` — либо «сырой» base64 (тогда считается PNG), либо готовый data-URL
+  (`data:image/webp;base64,…` / jpeg / png) — для не-PNG форматов.
+- Тяжёлые картинки удобно паковать скриптом (см. `tools/pack-kitchen-config.ps1`:
+  ужимает иконки до 128px, фон/доску берёт как есть, кладёт в `*.assets.js`).
+
+### Режимы сцены match3
+
+- **Классика**: очки за совпадения; `rules.scorePerTile`, фиксированный `tileNames`.
+- **Цель/раунды** (если задан `rules.goal`): собрать `goal` штук тайла-задания за раунд
+  (таймер). Собрал — новый раунд: новый набор еды (`rules.pool` + `rules.typeCount`),
+  новая цель, таймер сброшен; счёт = число раундов. `rules.boardImage` — картинка-подложка
+  поля. HUD кастомный (иконка цели + прогресс + таймер + уровень). Пример: `hungry-kitchen`.
 
 ## Протокол Sharky (его ведёт ядро, сцена не трогает)
 

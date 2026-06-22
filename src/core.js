@@ -79,12 +79,15 @@
     get theme() { return theme; },
     get rules() { return rules; },
     get score() { return score; },
+    get timeLeft() { return timeLeft; },
+    get duration() { return duration; },
     img: function (name) { return IMG[name]; },
     beep: beep,
     burst: burst,
     addScore: addScore,
     setScore: setScore,
     gameOver: gameOver,
+    resetTimer: resetTimer,
     rr: rr,
     accent: accent,
   };
@@ -95,6 +98,13 @@
     boot: boot,
   };
   global.Engine = Engine;
+
+  // Диагностика (можно дёрнуть из консоли): текущее состояние движка.
+  Engine.debug = function () {
+    return { state: state, running: running, assetsReady: assetsReady, pendingStart: pendingStart,
+             gotShell: gotShell, imgLoaded: imgLoaded, imgTotal: imgTotal, hasScene: !!scene,
+             W: W, H: H };
+  };
 
   // ════════════════════════════════════════════ BOOT
   function boot(config) {
@@ -108,6 +118,7 @@
     const factory = Engine.scenes[config.genre];
     if (!factory) { console.error('Engine: нет сцены для жанра', config.genre); return; }
     scene = factory(api, config);
+    Engine._scene = scene;   // для отладки/тестов
 
     window.addEventListener('resize', resize);
     bindInput();
@@ -140,14 +151,18 @@
     names.forEach(function (n) {
       const im = new Image();
       im.onload = im.onerror = function () { imgLoaded++; if (imgLoaded >= imgTotal) onReady(); };
-      im.src = 'data:image/png;base64,' + map[n];
+      const v = map[n];
+      // поддержка готовых data-URL (jpg/webp/png) и «сырого» base64 (по умолч. png)
+      im.src = (typeof v === 'string' && v.lastIndexOf('data:', 0) === 0) ? v : ('data:image/png;base64,' + v);
       IMG[n] = im;
     });
   }
   function onReady() {
     resize();
-    if (scene.init) scene.init();
-    newRun();
+    try {
+      if (scene.init) scene.init();
+      newRun();
+    } catch (e) { console.error('Engine onReady scene error:', e); }
     assetsReady = true;
     try { const v = getComputedStyle(document.documentElement).getPropertyValue('--ac').trim(); if (v) theme.accent = v; } catch (e) {}
     send({ type: 'ready' });
@@ -178,7 +193,8 @@
   function loop(t) {
     if (!running) return;
     const dt = Math.min((t - last) / 1000, 0.05); last = t;
-    update(dt); render();
+    try { update(dt); render(); }
+    catch (e) { running = false; console.error('Engine loop error:', e); return; }
     raf = requestAnimationFrame(loop);
   }
   function update(dt) {
@@ -193,6 +209,8 @@
     state = 'over';
     send({ type: 'gameover', value: score });
   }
+  // Сброс таймера раунда (для пораундовых игр). Без аргумента — на полную длительность.
+  function resetTimer(sec) { if (sec) duration = sec; timeLeft = duration; }
 
   // ════════════════════════════════════════════ СЧЁТ
   function addScore(n) { setScore(score + n); }
@@ -203,13 +221,24 @@
 
   // ════════════════════════════════════════════ РЕНДЕР
   function render() {
-    const g = ctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, theme.bgTop || '#222'); g.addColorStop(1, theme.bgBottom || '#111');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    drawBg();
     if (scene.render) scene.render(ctx);
     drawParts();
-    drawHUD();
+    if (scene.hud) scene.hud(ctx); else drawHUD();
     if (state === 'over') drawOver();
+  }
+  function drawBg() {
+    const bg = theme.bgImage && IMG[theme.bgImage];
+    if (bg && bg.complete && bg.naturalWidth) {
+      // по ширине экрана, верх закреплён наверху, низ обрезается
+      const dh = bg.naturalHeight * (W / bg.naturalWidth);
+      ctx.drawImage(bg, 0, 0, W, dh);
+      if (dh < H) { ctx.fillStyle = theme.bgBottom || '#111'; ctx.fillRect(0, dh, W, H - dh); }
+    } else {
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, theme.bgTop || '#222'); g.addColorStop(1, theme.bgBottom || '#111');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    }
   }
   function drawHUD() {
     ctx.textBaseline = 'middle';

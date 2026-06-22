@@ -92,12 +92,15 @@ const CONFIG = {"genre":"match3","meta":{"title":"Sharky Match-3 — Medieval"},
     get theme() { return theme; },
     get rules() { return rules; },
     get score() { return score; },
+    get timeLeft() { return timeLeft; },
+    get duration() { return duration; },
     img: function (name) { return IMG[name]; },
     beep: beep,
     burst: burst,
     addScore: addScore,
     setScore: setScore,
     gameOver: gameOver,
+    resetTimer: resetTimer,
     rr: rr,
     accent: accent,
   };
@@ -108,6 +111,13 @@ const CONFIG = {"genre":"match3","meta":{"title":"Sharky Match-3 — Medieval"},
     boot: boot,
   };
   global.Engine = Engine;
+
+  // Диагностика (можно дёрнуть из консоли): текущее состояние движка.
+  Engine.debug = function () {
+    return { state: state, running: running, assetsReady: assetsReady, pendingStart: pendingStart,
+             gotShell: gotShell, imgLoaded: imgLoaded, imgTotal: imgTotal, hasScene: !!scene,
+             W: W, H: H };
+  };
 
   // ════════════════════════════════════════════ BOOT
   function boot(config) {
@@ -121,6 +131,7 @@ const CONFIG = {"genre":"match3","meta":{"title":"Sharky Match-3 — Medieval"},
     const factory = Engine.scenes[config.genre];
     if (!factory) { console.error('Engine: нет сцены для жанра', config.genre); return; }
     scene = factory(api, config);
+    Engine._scene = scene;   // для отладки/тестов
 
     window.addEventListener('resize', resize);
     bindInput();
@@ -153,14 +164,18 @@ const CONFIG = {"genre":"match3","meta":{"title":"Sharky Match-3 — Medieval"},
     names.forEach(function (n) {
       const im = new Image();
       im.onload = im.onerror = function () { imgLoaded++; if (imgLoaded >= imgTotal) onReady(); };
-      im.src = 'data:image/png;base64,' + map[n];
+      const v = map[n];
+      // поддержка готовых data-URL (jpg/webp/png) и «сырого» base64 (по умолч. png)
+      im.src = (typeof v === 'string' && v.lastIndexOf('data:', 0) === 0) ? v : ('data:image/png;base64,' + v);
       IMG[n] = im;
     });
   }
   function onReady() {
     resize();
-    if (scene.init) scene.init();
-    newRun();
+    try {
+      if (scene.init) scene.init();
+      newRun();
+    } catch (e) { console.error('Engine onReady scene error:', e); }
     assetsReady = true;
     try { const v = getComputedStyle(document.documentElement).getPropertyValue('--ac').trim(); if (v) theme.accent = v; } catch (e) {}
     send({ type: 'ready' });
@@ -191,7 +206,8 @@ const CONFIG = {"genre":"match3","meta":{"title":"Sharky Match-3 — Medieval"},
   function loop(t) {
     if (!running) return;
     const dt = Math.min((t - last) / 1000, 0.05); last = t;
-    update(dt); render();
+    try { update(dt); render(); }
+    catch (e) { running = false; console.error('Engine loop error:', e); return; }
     raf = requestAnimationFrame(loop);
   }
   function update(dt) {
@@ -206,6 +222,8 @@ const CONFIG = {"genre":"match3","meta":{"title":"Sharky Match-3 — Medieval"},
     state = 'over';
     send({ type: 'gameover', value: score });
   }
+  // Сброс таймера раунда (для пораундовых игр). Без аргумента — на полную длительность.
+  function resetTimer(sec) { if (sec) duration = sec; timeLeft = duration; }
 
   // ════════════════════════════════════════════ СЧЁТ
   function addScore(n) { setScore(score + n); }
@@ -216,13 +234,24 @@ const CONFIG = {"genre":"match3","meta":{"title":"Sharky Match-3 — Medieval"},
 
   // ════════════════════════════════════════════ РЕНДЕР
   function render() {
-    const g = ctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, theme.bgTop || '#222'); g.addColorStop(1, theme.bgBottom || '#111');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    drawBg();
     if (scene.render) scene.render(ctx);
     drawParts();
-    drawHUD();
+    if (scene.hud) scene.hud(ctx); else drawHUD();
     if (state === 'over') drawOver();
+  }
+  function drawBg() {
+    const bg = theme.bgImage && IMG[theme.bgImage];
+    if (bg && bg.complete && bg.naturalWidth) {
+      // по ширине экрана, верх закреплён наверху, низ обрезается
+      const dh = bg.naturalHeight * (W / bg.naturalWidth);
+      ctx.drawImage(bg, 0, 0, W, dh);
+      if (dh < H) { ctx.fillStyle = theme.bgBottom || '#111'; ctx.fillRect(0, dh, W, H - dh); }
+    } else {
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, theme.bgTop || '#222'); g.addColorStop(1, theme.bgBottom || '#111');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    }
   }
   function drawHUD() {
     ctx.textBaseline = 'middle';
@@ -355,29 +384,48 @@ const CONFIG = {"genre":"match3","meta":{"title":"Sharky Match-3 — Medieval"},
 /* ============================================================
    СЦЕНА: match-3 (match3.js)
    ------------------------------------------------------------
-   Чистая механика «три в ряд», без инфраструктуры — её даёт ядро
-   (core.js): canvas, цикл, ввод, звук, частицы, HUD, таймер,
-   экран Game Over и протокол Sharky.
+   Механика «три в ряд». Инфраструктуру даёт ядро (core.js):
+   canvas, цикл, ввод, звук, частицы, таймер, экран Game Over,
+   протокол Sharky.
 
-   Что сцена берёт из CONFIG.rules:
-     cols, rows        — размер поля (по умолчанию 7×8)
-     minRun            — длина совпадения (3)
-     clearDur          — длительность анимации схлопывания, с (0.18)
-     scorePerTile      — очков за тайл (10)
-   и CONFIG.tileNames / CONFIG.assets — список типов тайлов (картинки).
+   Два режима (выбираются через CONFIG.rules):
+   ── КЛАССИКА (по умолчанию) ──
+     Очки за совпадения, фиксированный набор тайлов (CONFIG.tileNames),
+     счёт = накопленные очки, стандартный HUD ядра.
+   ── ЦЕЛЬ/РАУНДЫ (если задан rules.goal) ──
+     Нужно собрать rules.goal штук тайла-задания за раунд (таймер ядра).
+     Собрал — раунд пройден: новый набор еды, новая цель, таймер
+     сбрасывается (engine.resetTimer). Не успел — Game Over.
+     Счёт = число пройденных раундов. Свой HUD (иконка цели + прогресс + таймер).
 
-   Это первый модуль универсального движка. Новый match-3 = новый
-   CONFIG (другие картинки/цвета/числа), код сцены не меняется.
+   CONFIG.rules:
+     cols, rows        размер поля
+     minRun            длина совпадения (3)
+     clearDur          анимация схлопывания, с (0.18)
+     scorePerTile      очков за тайл (классика, 10)
+     goal              сколько собрать тайла-задания за раунд (вкл. режим цели)
+     typeCount         сколько типов тайлов на поле в раунде (по умолч. = длине набора)
+     pool              имена ассетов-кандидатов; каждый раунд из них берётся typeCount
+     boardImage        имя ассета-подложки поля (напр. доска); иначе рисуется рамка
    ============================================================ */
 Engine.register('match3', function (engine, cfg) {
   'use strict';
   const R = cfg.rules || {};
   const COLS = R.cols || 7, ROWS = R.rows || 8;
-  const NAMES = cfg.tileNames || Object.keys(cfg.assets || {});
-  const N = NAMES.length;
   const MINRUN = R.minRun || 3;
   const CLEAR_DUR = R.clearDur || 0.18;
   const SCORE = R.scorePerTile || 10;
+
+  const GOAL = R.goal || 0;
+  const goalMode = GOAL > 0;
+  const POOL = (R.pool && R.pool.length) ? R.pool.slice() : null;
+  const FIXED = (cfg.tileNames || Object.keys(cfg.assets || {})).filter(function (n) { return n !== R.boardImage && n !== (cfg.theme && cfg.theme.bgImage); });
+  const TYPE_COUNT = R.typeCount || FIXED.length;
+  const BOARD_IMG = R.boardImage || null;
+
+  // активный набор тайлов раунда (в классике — фиксированный)
+  let activeNames = FIXED.slice();
+  let N = activeNames.length;
 
   let grid = [];
   let cell = 40, originX = 0, originY = 0;
@@ -385,6 +433,9 @@ Engine.register('match3', function (engine, cfg) {
   let multiplier = 1;
   let selCell = null, downCell = null;
   let lastSwap = null, matchedCells = [], clearTimer = 0, clearProg = 0;
+
+  // режим цели
+  let collected = 0, rounds = 0, targetIdx = 0, targetName = activeNames[0];
 
   // ── геометрия ──
   function cellX(c) { return originX + c * cell; }
@@ -400,6 +451,20 @@ Engine.register('match3', function (engine, cfg) {
       const t = grid[r] && grid[r][c];
       if (t) { t.tx = cellX(c); t.ty = cellY(r); t.px = t.tx; t.py = t.ty; }
     }
+  }
+
+  // ── набор тайлов раунда ──
+  function pickRound() {
+    if (POOL) {
+      const pool = POOL.slice();
+      for (let i = pool.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; const tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp; }
+      activeNames = pool.slice(0, Math.min(TYPE_COUNT, pool.length));
+    } else {
+      activeNames = FIXED.slice();
+    }
+    N = activeNames.length;
+    targetIdx = (Math.random() * N) | 0;
+    targetName = activeNames[targetIdx];
   }
 
   // ── утилиты поля ──
@@ -483,7 +548,7 @@ Engine.register('match3', function (engine, cfg) {
   function enterClear(cells) {
     matchedCells = cells;
     for (let i = 0; i < cells.length; i++) { const t = grid[cells[i][0]][cells[i][1]]; if (t) t.clearing = true; }
-    engine.addScore(cells.length * SCORE * multiplier);
+    if (!goalMode) engine.addScore(cells.length * SCORE * multiplier);
     clearTimer = 0; clearProg = 0; phase = 'clear';
     engine.beep(440 + Math.min(multiplier, 8) * 70, 0.12, 'square', 0.18);
     if (multiplier >= 2) engine.beep(660 + multiplier * 60, 0.10, 'triangle', 0.14);
@@ -491,7 +556,10 @@ Engine.register('match3', function (engine, cfg) {
   function doRemoveAndFall() {
     for (let i = 0; i < matchedCells.length; i++) {
       const r = matchedCells[i][0], c = matchedCells[i][1], t = grid[r][c];
-      if (t) engine.burst(t.px + cell / 2, t.py + cell / 2);
+      if (t) {
+        engine.burst(t.px + cell / 2, t.py + cell / 2);
+        if (goalMode && t.type === targetIdx) collected++;
+      }
       grid[r][c] = null;
     }
     matchedCells = [];
@@ -510,6 +578,18 @@ Engine.register('match3', function (engine, cfg) {
     phase = 'fall';
   }
 
+  // Раунд пройден → новый набор еды, новая цель, сброс таймера.
+  function advanceRound() {
+    rounds++;
+    engine.setScore(rounds);
+    pickRound();
+    collected = 0; multiplier = 1; selCell = null; downCell = null;
+    buildBoard(); phase = 'idle';
+    engine.resetTimer();
+    engine.beep(523, 0.10, 'square', 0.18);
+    engine.beep(784, 0.12, 'triangle', 0.16);
+  }
+
   function moveTiles(dt) {
     let moving = false;
     const k = Math.min(1, dt * 16);
@@ -521,17 +601,59 @@ Engine.register('match3', function (engine, cfg) {
     return moving;
   }
 
-  // ── ввод (геометрия совпадений + свайп/тап) ──
   function cellAt(x, y) {
     const c = Math.floor((x - originX) / cell), r = Math.floor((y - originY) / cell);
     if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return null;
     return { r: r, c: c };
   }
 
+  // ── рисование подложки поля ──
+  function drawCover(ctx, img, x, y, w, h) {
+    const ir = img.naturalWidth / img.naturalHeight, rr = w / h;
+    let sw, sh, sx, sy;
+    if (ir > rr) { sh = img.naturalHeight; sw = sh * rr; sx = (img.naturalWidth - sw) / 2; sy = 0; }
+    else { sw = img.naturalWidth; sh = sw / rr; sx = 0; sy = (img.naturalHeight - sh) / 2; }
+    ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+  }
+
+  // ── кастомный HUD режима цели (иконка задания + прогресс + таймер + уровень) ──
+  function sceneHud(ctx) {
+    const W = engine.W, headerH = engine.headerH;
+    const font = (cfg.theme && cfg.theme.font) || 'sans-serif';
+    const hudText = (cfg.theme && cfg.theme.hudText) || '#fff';
+    const ac = engine.accent();
+    const cy = headerH / 2;
+    ctx.fillStyle = 'rgba(0,0,0,0.42)'; ctx.fillRect(0, 0, W, headerH);  // плашка читаемости
+    ctx.textBaseline = 'middle';
+    // цель: иконка + N/GOAL
+    const img = engine.img(targetName);
+    const ic = Math.min(headerH * 0.74, 46);
+    let tx = 12;
+    if (img && img.complete) { ctx.drawImage(img, tx, cy - ic / 2, ic, ic); tx += ic + 8; }
+    ctx.fillStyle = hudText; ctx.textAlign = 'left';
+    ctx.font = 'bold ' + Math.round(headerH * 0.36) + 'px ' + font;
+    ctx.fillText(Math.min(collected, GOAL) + '/' + GOAL, tx, cy);
+    // таймер-бар справа
+    const bx = W * 0.52, bw = W - bx - 12, by = cy - 8, bh = 16;
+    ctx.fillStyle = 'rgba(0,0,0,0.45)'; engine.rr(bx, by, bw, bh, 8); ctx.fill();
+    const frac = Math.max(0, engine.timeLeft / engine.duration);
+    ctx.fillStyle = frac < 0.25 ? '#e0533d' : ac; engine.rr(bx, by, Math.max(2, bw * frac), bh, 8); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.5; engine.rr(bx, by, bw, bh, 8); ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 12px ' + font; ctx.textAlign = 'center';
+    ctx.fillText(Math.ceil(engine.timeLeft) + ' c', bx + bw / 2, by + bh / 2);
+    // номер уровня
+    ctx.fillStyle = 'rgba(255,255,255,0.72)'; ctx.font = 'bold 11px ' + font; ctx.textAlign = 'right';
+    ctx.fillText('Уровень ' + (rounds + 1), W - 12, headerH - 9);
+  }
+
   // ── публичный контракт сцены ──
   return {
     init: function () { /* геометрию даёт layout, поле строит reset */ },
-    reset: function () { buildBoard(); phase = 'idle'; multiplier = 1; selCell = null; downCell = null; },
+    reset: function () {
+      rounds = 0; collected = 0; multiplier = 1; selCell = null; downCell = null;
+      if (goalMode) pickRound();
+      buildBoard(); phase = 'idle';
+    },
     layout: layout,
     update: function (dt) {
       const moving = moveTiles(dt);
@@ -546,33 +668,38 @@ Engine.register('match3', function (engine, cfg) {
       } else if (phase === 'fall' && !moving) {
         const m = findMatches();
         if (m.length) { multiplier++; enterClear(m); }
-        else { multiplier = 1; phase = 'idle'; if (!hasMove()) reshuffle(); }
+        else {
+          multiplier = 1; phase = 'idle';
+          if (goalMode && collected >= GOAL) advanceRound();
+          else if (!hasMove()) reshuffle();
+        }
       }
     },
     render: function (ctx) {
       const ac = engine.accent();
-      // рамка поля
       const pad = Math.round(cell * 0.18);
-      ctx.fillStyle = '#3a2f20';
-      engine.rr(originX - pad, originY - pad, cell * COLS + pad * 2, cell * ROWS + pad * 2, pad); ctx.fill();
-      ctx.strokeStyle = ac; ctx.lineWidth = 2;
-      engine.rr(originX - pad, originY - pad, cell * COLS + pad * 2, cell * ROWS + pad * 2, pad); ctx.stroke();
-      // клетки
-      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
-        const x = cellX(c), y = cellY(r);
-        ctx.fillStyle = ((r + c) & 1) ? 'rgba(255,240,200,0.06)' : 'rgba(0,0,0,0.18)';
-        ctx.fillRect(x + 1, y + 1, cell - 2, cell - 2);
+      const bx = originX - pad, by = originY - pad, bw = cell * COLS + pad * 2, bh = cell * ROWS + pad * 2;
+      const board = BOARD_IMG && engine.img(BOARD_IMG);
+      if (board && board.complete && board.naturalWidth) {
+        drawCover(ctx, board, bx, by, bw, bh);
+      } else {
+        ctx.fillStyle = '#3a2f20'; engine.rr(bx, by, bw, bh, pad); ctx.fill();
+        ctx.strokeStyle = ac; ctx.lineWidth = 2; engine.rr(bx, by, bw, bh, pad); ctx.stroke();
+        for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+          const x = cellX(c), y = cellY(r);
+          ctx.fillStyle = ((r + c) & 1) ? 'rgba(255,240,200,0.06)' : 'rgba(0,0,0,0.18)';
+          ctx.fillRect(x + 1, y + 1, cell - 2, cell - 2);
+        }
       }
       if (selCell) {
         const x = cellX(selCell.c), y = cellY(selCell.r);
         ctx.strokeStyle = ac; ctx.lineWidth = 3;
         engine.rr(x + 2, y + 2, cell - 4, cell - 4, 6); ctx.stroke();
       }
-      // тайлы
       const inset = cell * 0.1;
       for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
         const t = grid[r][c]; if (!t) continue;
-        const img = engine.img(NAMES[t.type]); if (!img || !img.complete) continue;
+        const img = engine.img(activeNames[t.type]); if (!img || !img.complete) continue;
         let s = t.clearing ? 1 - clearProg : 1;
         if (s <= 0.02) continue;
         const size = (cell - inset * 2) * s;
@@ -581,6 +708,13 @@ Engine.register('match3', function (engine, cfg) {
         ctx.drawImage(img, ccx - size / 2, ccy - size / 2, size, size);
         ctx.globalAlpha = 1;
       }
+    },
+    hud: goalMode ? sceneHud : undefined,
+    // отладка/тесты: снимок внутреннего состояния (без рендера)
+    _state: function () {
+      return { collected: collected, rounds: rounds, phase: phase, targetIdx: targetIdx, targetName: targetName,
+               N: N, activeNames: activeNames.slice(), cell: cell, originX: originX, originY: originY,
+               grid: grid.map(function (row) { return row.map(function (t) { return t ? t.type : null; }); }) };
     },
     pointerDown: function (p) { downCell = cellAt(p.x, p.y); },
     pointerUp: function (e) {
