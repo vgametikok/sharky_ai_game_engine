@@ -617,33 +617,62 @@ Engine.register('match3', function (engine, cfg) {
   }
 
   // ── кастомный HUD режима цели (иконка задания + прогресс + таймер + уровень) ──
+  // HUD режима цели: задание (КРУПНАЯ иконка цели + прогресс) и полоса времени —
+  // прямо над верхней кромкой доски (а не в верхней полосе экрана).
   function sceneHud(ctx) {
-    const W = engine.W, headerH = engine.headerH;
     const font = (cfg.theme && cfg.theme.font) || 'sans-serif';
     const hudText = (cfg.theme && cfg.theme.hudText) || '#fff';
     const ac = engine.accent();
-    const cy = headerH / 2;
-    ctx.fillStyle = 'rgba(0,0,0,0.42)'; ctx.fillRect(0, 0, W, headerH);  // плашка читаемости
-    ctx.textBaseline = 'middle';
-    // цель: иконка + N/GOAL
-    const img = engine.img(targetName);
-    const ic = Math.min(headerH * 0.74, 46);
-    let tx = 12;
-    if (img && img.complete) { ctx.drawImage(img, tx, cy - ic / 2, ic, ic); tx += ic + 8; }
-    ctx.fillStyle = hudText; ctx.textAlign = 'left';
-    ctx.font = 'bold ' + Math.round(headerH * 0.36) + 'px ' + font;
-    ctx.fillText(Math.min(collected, GOAL) + '/' + GOAL, tx, cy);
-    // таймер-бар справа
-    const bx = W * 0.52, bw = W - bx - 12, by = cy - 8, bh = 16;
-    ctx.fillStyle = 'rgba(0,0,0,0.45)'; engine.rr(bx, by, bw, bh, 8); ctx.fill();
+    const pad = Math.round(cell * 0.18);
+    const boardTop = originY - pad;
+    const boardW = cell * COLS;
+    const gap = Math.max(6, Math.round(cell * 0.14));
+    const radius = Math.round(cell * 0.25);
+
+    // ── полоса времени: во всю ширину доски, вплотную над ней ──
+    const barH = Math.max(14, Math.round(cell * 0.34));
+    const barX = originX, barW = boardW;
+    const barY = boardTop - gap - barH;
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'; engine.rr(barX, barY, barW, barH, barH / 2); ctx.fill();
     const frac = Math.max(0, engine.timeLeft / engine.duration);
-    ctx.fillStyle = frac < 0.25 ? '#e0533d' : ac; engine.rr(bx, by, Math.max(2, bw * frac), bh, 8); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.5; engine.rr(bx, by, bw, bh, 8); ctx.stroke();
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 12px ' + font; ctx.textAlign = 'center';
-    ctx.fillText(Math.ceil(engine.timeLeft) + ' c', bx + bw / 2, by + bh / 2);
-    // номер уровня
-    ctx.fillStyle = 'rgba(255,255,255,0.72)'; ctx.font = 'bold 11px ' + font; ctx.textAlign = 'right';
-    ctx.fillText('Уровень ' + (rounds + 1), W - 12, headerH - 9);
+    ctx.fillStyle = frac < 0.25 ? '#e0533d' : ac;
+    engine.rr(barX, barY, Math.max(barH, barW * frac), barH, barH / 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.5; engine.rr(barX, barY, barW, barH, barH / 2); ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = 'bold ' + Math.round(barH * 0.66) + 'px ' + font;
+    ctx.fillText(Math.ceil(engine.timeLeft) + ' с', barX + barW / 2, barY + barH / 2 + 1);
+
+    // ── карточка задания над полосой: КРУПНАЯ иконка цели + N/GOAL ──
+    const isz = Math.round(cell * 1.35);                       // крупная иконка
+    const countFont = Math.round(cell * 0.72);
+    ctx.font = 'bold ' + countFont + 'px ' + font;
+    const countTxt = Math.min(collected, GOAL) + '/' + GOAL;
+    const txtW = ctx.measureText(countTxt).width;
+    const innerGap = Math.round(cell * 0.22);
+    const cardPadX = Math.round(cell * 0.3), cardPadY = Math.round(cell * 0.16);
+    const cardW = isz + innerGap + txtW + cardPadX * 2;
+    const cardH = isz + cardPadY * 2;
+    const cardX = originX + (boardW - cardW) / 2;
+    const cardY = barY - gap - cardH;
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'; engine.rr(cardX, cardY, cardW, cardH, radius); ctx.fill();
+    ctx.strokeStyle = ac; ctx.lineWidth = 2; engine.rr(cardX, cardY, cardW, cardH, radius); ctx.stroke();
+    const icon = engine.img(targetName);
+    if (icon && icon.complete) ctx.drawImage(icon, cardX + cardPadX, cardY + cardPadY, isz, isz);
+    ctx.fillStyle = hudText; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.font = 'bold ' + countFont + 'px ' + font;
+    ctx.fillText(countTxt, cardX + cardPadX + isz + innerGap, cardY + cardH / 2 + 1);
+
+    // ── уровень: мелко, по центру над карточкой (не залезая за край экрана) ──
+    const lvlY = cardY - Math.round(cell * 0.18);
+    if (lvlY > Math.round(cell * 0.5)) {
+      ctx.save();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+      ctx.font = 'bold ' + Math.round(cell * 0.38) + 'px ' + font;
+      ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 1;
+      ctx.fillStyle = '#fff';
+      ctx.fillText('Уровень ' + (rounds + 1), originX + boardW / 2, lvlY);
+      ctx.restore();
+    }
   }
 
   // ── публичный контракт сцены ──
