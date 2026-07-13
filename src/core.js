@@ -68,6 +68,9 @@
 
   // ── ввод ──
   let downX = 0, downY = 0, hasDown = false;
+  const pointers = {};        // pointerId → {x,y} точки нажатия (мультитач)
+  const keys = new Set();     // зажатые клавиши (для платформеров и т.п.)
+  const GAME_KEYS = [' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 
   // ── объект, который получает сцена ──
   const api = {
@@ -81,6 +84,8 @@
     get score() { return score; },
     get timeLeft() { return timeLeft; },
     get duration() { return duration; },
+    get state() { return state; },
+    get keys() { return keys; },          // живой Set зажатых клавиш
     img: function (name) { return IMG[name]; },
     beep: beep,
     burst: burst,
@@ -105,6 +110,8 @@
              gotShell: gotShell, imgLoaded: imgLoaded, imgTotal: imgTotal, hasScene: !!scene,
              W: W, H: H };
   };
+  // Принудительный одиночный кадр (для тестов в скрытой вкладке, где rAF не тикает).
+  Engine.renderOnce = function () { if (scene && assetsReady) render(); };
 
   // ════════════════════════════════════════════ BOOT
   function boot(config) {
@@ -171,7 +178,7 @@
 
   // ════════════════════════════════════════════ ЖИЗНЕННЫЙ ЦИКЛ
   function newRun() {
-    score = 0; timeLeft = duration; state = 'playing'; parts.length = 0;
+    score = 0; timeLeft = duration; state = 'playing'; parts.length = 0; overLabel = null;
     if (scene.reset) scene.reset();
     send({ type: 'score', value: 0 });
   }
@@ -204,8 +211,10 @@
     }
     updateParts(dt);
   }
-  function gameOver() {
+  let overLabel = null;   // надпись на экране конца (переопределяет labels.over, напр. «ПОБЕДА»)
+  function gameOver(opts) {
     if (state === 'over') return;
+    overLabel = (opts && opts.label) || null;
     state = 'over';
     send({ type: 'gameover', value: score });
   }
@@ -270,7 +279,7 @@
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     const font = theme.font || "Georgia, serif";
     ctx.fillStyle = accent(); ctx.font = 'bold ' + Math.round(W * 0.085) + 'px ' + font;
-    ctx.fillText(L.over || 'GAME OVER', W / 2, H * 0.4);
+    ctx.fillText(overLabel || L.over || 'GAME OVER', W / 2, H * 0.4);
     ctx.fillStyle = theme.hudText || '#f4e3b0'; ctx.font = 'bold ' + Math.round(W * 0.13) + 'px ' + font;
     ctx.fillText(String(score), W / 2, H * 0.52);
     ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.font = Math.round(W * 0.045) + 'px ' + font;
@@ -336,21 +345,34 @@
     cv.addEventListener('pointerdown', function (e) {
       ensureAudio(); if (audioCtx && audioCtx.state !== 'running') audioCtx.resume();
       if (state === 'over') { restart(); return; }
-      const p = localPt(e); downX = p.x; downY = p.y; hasDown = true;
+      const p = localPt(e); p.id = e.pointerId;
+      pointers[e.pointerId] = { x: p.x, y: p.y };
+      downX = p.x; downY = p.y; hasDown = true;   // совместимость со сценами без мультитача
       if (scene.pointerDown) scene.pointerDown(p);
     });
-    cv.addEventListener('pointerup', function (e) {
-      if (state === 'over') { hasDown = false; return; }
-      const p = localPt(e);
-      const dx = p.x - downX, dy = p.y - downY, dist = Math.sqrt(dx * dx + dy * dy);
-      const dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
-      if (scene.pointerUp) scene.pointerUp({ x: p.x, y: p.y, downX: downX, downY: downY, dx: dx, dy: dy, dist: dist, dir: dir, had: hasDown });
-      hasDown = false;
-    });
+    cv.addEventListener('pointerup', function (e) { endPointer(e, false); });
+    cv.addEventListener('pointercancel', function (e) { endPointer(e, true); });
     cv.addEventListener('pointermove', function (e) {
-      if (scene.pointerMove) scene.pointerMove(localPt(e));
+      if (scene.pointerMove) { const p = localPt(e); p.id = e.pointerId; scene.pointerMove(p); }
     });
-    window.addEventListener('keydown', function (e) { if (scene.key) scene.key(e.key); });
+    window.addEventListener('keydown', function (e) {
+      if (GAME_KEYS.indexOf(e.key) !== -1) e.preventDefault();
+      keys.add(e.key);
+      if (scene.key) scene.key(e.key);
+    });
+    window.addEventListener('keyup', function (e) { keys.delete(e.key); });
+    window.addEventListener('blur', function () { keys.clear(); });
+  }
+  function endPointer(e, cancelled) {
+    const start = pointers[e.pointerId]; delete pointers[e.pointerId];
+    if (state === 'over') { hasDown = false; return; }
+    const p = localPt(e);
+    const sx = start ? start.x : downX, sy = start ? start.y : downY;
+    const dx = p.x - sx, dy = p.y - sy, dist = Math.sqrt(dx * dx + dy * dy);
+    const dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+    if (scene.pointerUp) scene.pointerUp({ x: p.x, y: p.y, id: e.pointerId, downX: sx, downY: sy,
+      dx: dx, dy: dy, dist: dist, dir: dir, had: hasDown, cancelled: !!cancelled });
+    hasDown = false;
   }
 
   // ════════════════════════════════════════════ ПРОТОКОЛ SHARKY

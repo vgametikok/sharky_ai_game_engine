@@ -52,6 +52,21 @@ node build.js --all               # собрать все конфиги из ga
   получи новый набор еды и новую цель. Поле 7×7, доска-подложка, фон-кухня.
   Ассеты пакуются `tools/pack-kitchen-config.ps1` → `games/hungry-kitchen.assets.js`,
   подписи/правила — в `games/hungry-kitchen.config.js`.
+- `platformer-demo` — платформер: 2 уровня, враги, NPC, меч+лук, ключ/дверь,
+  способность «двойной прыжок», босс с фазами на 2-м уровне.
+- `runner-demo` — бесконечный раннер из чанков (автобег, тап = прыжок, счёт-дистанция).
+- `caves-demo` — спеланки-лайт: уровень генерируется из комнат с гарантированным путём;
+  соулслайк-примесь (стамина, перекат с i-frames, лечащий чекпоинт).
+
+### Скриншоты в скрытой вкладке предпросмотра
+`requestAnimationFrame` не тикает в скрытой панели — обычный скриншот-инструмент
+может таймаутить, а канвас пустует. Обход: `Engine.renderOnce()` рисует один кадр
+принудительно, а `tools/serve.js` принимает `POST /shot?name=x` с dataURL канваса
+и сохраняет `dist/shots/x.png`:
+```js
+Engine.renderOnce();
+fetch('/shot?name=x', { method:'POST', body: document.getElementById('c').toDataURL('image/png') });
+```
 
 ## Как сгенерировать новую игру того же жанра (дёшево)
 
@@ -120,6 +135,38 @@ node build.js --all               # собрать все конфиги из ga
   (таймер). Собрал — новый раунд: новый набор еды (`rules.pool` + `rules.typeCount`),
   новая цель, таймер сброшен; счёт = число раундов. `rules.boardImage` — картинка-подложка
   поля. HUD кастомный (иконка цели + прогресс + таймер + уровень). Пример: `hungry-kitchen`.
+
+## Сцена platformer — 2D-платформеры данными
+
+Всё задаётся в `CONFIG.platformer` (полная схема — в шапке `src/scenes/platformer.js`);
+код сцены один на все игры: марио-стиль, метроидвания, соулслайк, спеланки, раннер.
+
+- **Уровни — ASCII-строки + легенда**: символ → тайл (`solid`, `oneWay`, `ladder`,
+  `hazard`, `door`) или сущность (`player/exit/checkpoint/pickup/enemy/npc/platform`).
+- **Три режима**: `mode:'levels'` (список карт, выход → следующая),
+  `mode:'runner'` (бесконечная лента из чанков `runner.chunks`, автобег, счёт-дистанция),
+  `mode:'caves'` (генерация из комнат `generator.rooms` {LR,LRD,LRU,LRUD,X} сеткой
+  с гарантированным путём сверху вниз — спеланки-лайт).
+- **Игрок**: coyote time, jump buffer, переменная высота прыжка; способности-гейты
+  `abilities:{doubleJump,wallJump,dash}` (метроидвания: открываются пикапами
+  `{pickup:'ability'}`), перекат с i-frames (`dashIFrames`), стамина (соулслайк:
+  `stamina:{max,regen,attackCost,dashCost}`), жизни, чекпоинты (`checkpointHeal`),
+  респаун врагов после смерти (`respawnEnemies`).
+- **Оружие** (`weapons`): `type:'melee'` (хитбокс по направлению, откидывание) и
+  `type:'ranged'` (снаряды); переключение; выдача через `{pickup:'weapon'}`.
+- **Враги** (`enemies`): `ai: patrol | chase | fly | shooter | jumper | turret`,
+  stomp по-мариовски (`stompable`), дропы, очки.
+- **Боссы**: `boss:{name, phases:[{hpPct,attacks,cooldown,speedMul}], onDeath}`,
+  атаки-паттерны `charge/aimed/spread/slam/summon`, полоса HP, выход заперт до победы
+  (у exit-тайла `needsBossDead:false` отключает гейт).
+- **NPC** (`npcs`): реплики в пузыре при приближении.
+- **Анимации**: `anims:{idle:{imgs:[...],fps}}` или спрайт-лист `{img,fw,fh,frames}`;
+  без спрайтов — цветные плейсхолдеры (`color`) — удобно для прототипов.
+- **Прочее**: движущиеся платформы (переносят игрока), параллакс `bgLayers`,
+  тряска камеры, тач-кнопки (мультитач) + клавиатура, звуковые пресеты.
+
+Отладка: `scene._state()` (снимок мира), `_press/_release` (виртуальные кнопки),
+`_teleport(x,y)`, `_cheat({inv,hp})` — детерминированные прогоны без rAF.
 
 ## Протокол Sharky (его ведёт ядро, сцена не трогает)
 
