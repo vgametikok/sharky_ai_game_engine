@@ -49,6 +49,19 @@ $groups = @{
     @{ k='turtle_0'; u="$B/6a405a9b-fa75-4e82-9b84-e39943e65050/56190410-f226-4c37-97ab-03103dfbbe87/rotations/east.png" }
   )
 }
+# RAW items (no crop/normalize): tiles must stay square, bg strips as-is
+$OBJ = "$B/objects/6a405a9b-fa75-4e82-9b84-e39943e65050"
+$rawItems = @(
+  @{ k='tile_sand';   u="$OBJ/f55999b0-6713-46a2-869c-37c2ebe8c985/rotations/unknown.png" },
+  @{ k='tile_sandf';  u="$OBJ/1c323626-0673-4112-b331-3e35797471ac/rotations/unknown.png" },
+  @{ k='tile_rock';   u="$OBJ/0435e619-4bd9-4c21-84fb-c5e27c13150a/rotations/unknown.png" },
+  @{ k='tile_metal';  u="$OBJ/e38342e8-3d0b-4659-b38c-b37215a6f4c2/rotations/unknown.png" },
+  @{ k='tile_plank';  u="$OBJ/ad20ce58-454c-4fe4-94b4-8c2cecf71884/rotations/unknown.png" },
+  @{ k='tile_shells'; u="$OBJ/82e38d80-7ad2-4e57-afff-15e0ac216822/rotations/unknown.png" },
+  @{ k='bg_day';      u="$OBJ/61597368-86ca-40f0-b305-3aafc98d5141/rotations/unknown.png" },
+  @{ k='bg_clouds';   u="$OBJ/9ded67d6-88e8-45e6-8de0-adab6802c8f9/rotations/unknown.png" }
+)
+
 # baron animation id: set $env:BARON_ANIM before running once the walk is ready
 if ($env:BARON_ANIM) {
   $groups['baron'] = @(
@@ -110,6 +123,13 @@ foreach ($g in $groups.Keys) {
     $assets[$it.k] = 'data:image/png;base64,' + [Convert]::ToBase64String($ms.ToArray())
     $ms.Dispose(); $gr.Dispose(); $dst.Dispose(); $src.Dispose()
   }
+}
+
+# raw pass-through (no normalization)
+foreach ($it in $rawItems) {
+  $f = Join-Path $tmp ($it.k + '.png')
+  if (-not (Test-Path $f)) { Invoke-WebRequest -Uri $it.u -OutFile $f -UseBasicParsing | Out-Null }
+  $assets[$it.k] = 'data:image/png;base64,' + [Convert]::ToBase64String([IO.File]::ReadAllBytes($f))
 }
 
 $json = $assets | ConvertTo-Json -Compress

@@ -21,7 +21,7 @@ module.exports = {
   assets: assets,
   theme: {
     accent: '#57c7ff',
-    bgTop: '#1c2f52', bgBottom: '#0a1526',
+    bgTop: '#8fd4f0', bgBottom: '#2a5f8a',
     font: "'Segoe UI', system-ui, sans-serif",
     labels: { over: 'МИССИЯ ПРОВАЛЕНА', win: 'РИФ СВОБОДЕН!', again: 'Тап — новая высадка', scoreUnit: 'очков', level: 'Зона' },
   },
@@ -118,11 +118,18 @@ module.exports = {
         anims: anims({ idle: { imgs: ['turtle_0'], fps: 1, w: 1.5, h: 1.5 } }),
       },
     },
+    // параллакс: облака (медленно) + тропический горизонт (быстрее)
+    bgLayers: A ? [
+      { img: 'bg_clouds', factor: 0.12, y: -10 },
+      { img: 'bg_day', factor: 0.35, y: 40 },
+    ] : [],
     legend: {
-      '#': { tile: true, solid: true, color: '#d8b56a' },   // песок
-      '=': { tile: true, solid: true, color: '#68584a' },   // скала
-      '%': { tile: true, solid: true, color: '#5a6a7a' },   // металл базы
-      '-': { tile: true, oneWay: true, color: '#b9855a' },  // мостик
+      '#': { tile: true, solid: true, color: '#d8b56a', img: A ? 'tile_sand' : undefined },    // песок с травкой
+      '*': { tile: true, solid: true, color: '#e0c078', img: A ? 'tile_shells' : undefined },  // песок с ракушками
+      '=': { tile: true, solid: true, color: '#68584a', img: A ? 'tile_rock' : undefined },    // скала
+      '%': { tile: true, solid: true, color: '#5a6a7a', img: A ? 'tile_metal' : undefined },   // металл базы
+      '-': { tile: true, oneWay: true, color: '#b9855a', img: A ? 'tile_plank' : undefined },  // мостик
+      '~': { tile: true, solid: true, color: '#d0ad62', img: A ? 'tile_sandf' : undefined },   // песок-заполнение
       '^': { tile: true, hazard: 1, color: '#7a5abf' },     // ядовитые ежи
       'P': { player: true },
       'E': { exit: true, color: '#7ce07c' },
@@ -151,9 +158,9 @@ module.exports = {
         "                                =                                =                        ",
         "  P    N    C C     g          ==        g      h        S      ==   g    h      C   E   ",
         "##############################################     ######################################",
-        "##############################################     ######################################",
-        "##############################################     ######################################",
-        "##############################################     ######################################",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
       ] },
       // ── Зона 2: ПРИБРЕЖНАЯ БАЗА (мини-босс Клешень) ──
       { map: [
