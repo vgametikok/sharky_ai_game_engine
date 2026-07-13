@@ -96,6 +96,7 @@ Engine.register('platformer', function (engine, cfg) {
   let time = 0;
   // отложенные переходы: нельзя пересобирать ents посреди цикла столкновений
   let pendingRespawn = false, pendingLevel = false;
+  let bonusT = 0;                                      // таймер спавна летающего бонуса
 
   // ════════════════════════════════ ТАЙЛЫ
   function L(ch) { return LEGEND[ch]; }
@@ -171,8 +172,19 @@ Engine.register('platformer', function (engine, cfg) {
       abilities: Object.assign({}, PLDEF.abilities || {}),
       stamina: PLDEF.stamina ? PLDEF.stamina.max : 0,
       coyote: 0, buffer: 0, jumps: 0, climbing: false,
-      inv: 0, attackT: 0, attackCd: 0, swingHit: null,
+      inv: 0, attackT: 0, attackCd: 0, swingHit: null, shootT: 0,
+      tempWeapon: null,                    // {id, t} — временное супер-оружие (бонус)
       dashT: 0, dashCd: 0, anim: { name: '', t: 0, i: 0 } };
+  }
+  // текущее оружие: временный бонус приоритетнее выбранного
+  function curWeapon() {
+    if (player.tempWeapon) return WEAPONS[player.tempWeapon.id];
+    return WEAPONS[player.weapons[player.weaponIdx]];
+  }
+  function curWeaponName() {
+    const id = player.tempWeapon ? player.tempWeapon.id : player.weapons[player.weaponIdx];
+    const w = WEAPONS[id];
+    return (w && w.name) || id;
   }
 
   // ════════════════════════════════ ПОСТРОЕНИЕ УРОВНЕЙ
@@ -377,6 +389,8 @@ Engine.register('platformer', function (engine, cfg) {
     if (stam()) p.stamina = Math.min(stam().max, p.stamina + stam().regen * dt);
     p.inv = Math.max(0, p.inv - dt);
     p.attackT = Math.max(0, p.attackT - dt);
+    p.shootT = Math.max(0, p.shootT - dt);
+    if (p.tempWeapon) { p.tempWeapon.t -= dt; if (p.tempWeapon.t <= 0) { p.tempWeapon = null; sfx('swap'); } }
     p.attackCd = Math.max(0, p.attackCd - dt);
     p.dashCd = Math.max(0, p.dashCd - dt);
     p.coyote = Math.max(0, p.coyote - dt);
@@ -450,13 +464,15 @@ Engine.register('platformer', function (engine, cfg) {
     else { p.wallT = Math.max(0, (p.wallT || 0) - dt); if (p.wallT <= 0) p.hitWallStick = 0; }
 
     // ── атака ──
-    if (pressed(cur, 'swap') && p.weapons.length > 1) { p.weaponIdx = (p.weaponIdx + 1) % p.weapons.length; sfx('swap'); }
-    if (pressed(cur, 'atk') && p.attackCd <= 0 && p.weapons.length) {
-      const w = WEAPONS[p.weapons[p.weaponIdx]];
-      if (w && useStamina(stam() ? stam().attackCost : 0)) {
+    if (pressed(cur, 'swap') && p.weapons.length > 1 && !p.tempWeapon) { p.weaponIdx = (p.weaponIdx + 1) % p.weapons.length; sfx('swap'); }
+    const w = curWeapon();
+    // auto-оружие стреляет пока зажата кнопка, обычное — по нажатию
+    const wantFire = w && (w.auto ? cur.atk : pressed(cur, 'atk'));
+    if (wantFire && p.attackCd <= 0) {
+      if (useStamina(stam() ? stam().attackCost : 0)) {
         p.attackCd = w.cooldown || 0.35;
         if (w.type === 'melee') { p.attackT = 0.16; p.swingHit = {}; sfx('swing'); }
-        else { fireProjectile(p, w, true); sfx('shoot'); }
+        else { fireWeapon(p, w); p.shootT = 0.14; sfx('shoot'); }
       }
     }
     afterMove(dt);
@@ -530,8 +546,22 @@ Engine.register('platformer', function (engine, cfg) {
       const len = Math.max(1, Math.hypot(dx, dy)); const s = w.speed || 200;
       vx = dx / len * s; vy = dy / len * s;
     }
-    ents.push({ kind: 'proj', x: cx - 3, y: cy - 3, w: 6, h: 6, vx: vx, vy: vy,
-      dmg: w.dmg || 1, friendly: !!friendly, life: w.life || 2, color: w.color || (friendly ? '#ffe08a' : '#ff7070'), grav: w.grav || 0 });
+    const r = w.size || 3;
+    const pr = { kind: 'proj', x: cx - r, y: cy - r, w: r * 2, h: r * 2, vx: vx, vy: vy,
+      dmg: w.dmg || 1, friendly: !!friendly, life: w.life || 2, pierce: !!w.pierce, hitSet: null,
+      color: w.color || (friendly ? '#ffe08a' : '#ff7070'), grav: w.grav || 0 };
+    ents.push(pr);
+  }
+  // выстрел игрока: count снарядов веером на w.spread радиан
+  function fireWeapon(src, w) {
+    const n = w.count || 1;
+    const base = src.facing > 0 ? 0 : Math.PI;
+    if (n === 1) { fireProjectile(src, w, true); return; }
+    const total = w.spread || 0.5;
+    for (let i = 0; i < n; i++) {
+      const off = (i - (n - 1) / 2) * (total / Math.max(1, n - 1));
+      fireProjectile(src, w, true, base - off * (src.facing > 0 ? 1 : -1));
+    }
   }
   function meleeHitbox() {
     const p = player, w = WEAPONS[p.weapons[p.weaponIdx]];
@@ -698,7 +728,10 @@ Engine.register('platformer', function (engine, cfg) {
       case 'maxhp': p.maxHp += (d.value || 1); p.hp = p.maxHp; sfx('power'); break;
       case 'key': p.keysN++; sfx('key'); break;
       case 'ability': p.abilities[d.ability] = true; sfx('power'); break;
-      case 'weapon': if (p.weapons.indexOf(d.weapon) === -1) p.weapons.push(d.weapon); p.weaponIdx = p.weapons.length - 1; sfx('power'); break;
+      case 'weapon':
+        if (d.temp) { p.tempWeapon = { id: d.weapon, t: d.temp, total: d.temp }; }  // временный бонус (Contra-style)
+        else { if (p.weapons.indexOf(d.weapon) === -1) p.weapons.push(d.weapon); p.weaponIdx = p.weapons.length - 1; }
+        sfx('power'); break;
       default: addScore(d.value || 5); sfx('coin');
     }
     burstAt(e.x + e.w / 2, e.y + e.h / 2, { count: 8, color: d.color || '#fc3' });
@@ -729,14 +762,21 @@ Engine.register('platformer', function (engine, cfg) {
     if (!def.anims) return null;
     let name = 'idle';
     if (e === player) {
-      if (player.attackT > 0) name = 'attack';
-      else if (player.dashT > 0) name = 'dash';
+      if (player.dashT > 0) name = 'dash';
       else if (!player.onGround) name = player.vy < 0 ? 'jump' : 'fall';
       else if (Math.abs(player.vx) > 10) name = 'run';
+      // выстрел/удар перекрывает позу, если такая анимация есть
+      if (player.attackT > 0 && def.anims.attack) name = 'attack';
+      else if (player.shootT > 0 && def.anims.shoot) name = 'shoot';
     } else {
       if (Math.abs(e.vx) > 5 || Math.abs(e.vy || 0) > 5) name = 'run';
     }
-    return def.anims[name] ? name : (def.anims.idle ? 'idle' : Object.keys(def.anims)[0]);
+    if (!def.anims[name]) {
+      // фолбэки: fall→jump, dash/attack/shoot→run/idle
+      if (name === 'fall' && def.anims.jump) name = 'jump';
+      else name = def.anims.idle ? 'idle' : Object.keys(def.anims)[0];
+    }
+    return name;
   }
   function drawEnt(ctx, e, def, isPlayer) {
     const name = pickAnim(e, def);
@@ -818,6 +858,25 @@ Engine.register('platformer', function (engine, cfg) {
         runnerCleanup();
       }
 
+      // ── летающие бонусы оружия (Contra-style: пролетают через экран) ──
+      const BS = P.bonusSpawner;
+      if (BS && BS.items && BS.items.length) {
+        bonusT -= dt;
+        if (bonusT <= 0) {
+          const ev = BS.every || [9, 15];
+          bonusT = ev[0] + Math.random() * (ev[1] - ev[0]);
+          const item = BS.items[(Math.random() * BS.items.length) | 0];
+          const dir = Math.random() < 0.5 ? 1 : -1;
+          const x0 = dir > 0 ? cam.x - TS * 2 : cam.x + viewW + TS * 2;
+          const by = player.y - TS * (1.5 + Math.random() * 1.5);
+          ents.push({ kind: 'pickup', key: null, t: Math.random() * 6,
+            def: { pickup: 'weapon', weapon: item.weapon, temp: item.temp || 10, color: item.color || '#fff', label: item.label },
+            x: x0, y: by, w: TS * 0.8, h: TS * 0.8,
+            fly: true, fvx: dir * (BS.speed || 55), baseY: by, life: 14 });
+          sfx('swap');
+        }
+      }
+
       // платформы двигаем ДО игрока (чтобы pdx был готов)
       for (let i = 0; i < ents.length; i++) {
         const e = ents[i]; if (e.kind !== 'platform') continue;
@@ -840,7 +899,15 @@ Engine.register('platformer', function (engine, cfg) {
           e.x += e.vx * dt; e.y += e.vy * dt;
           const tx = Math.floor((e.x + 3) / TS), ty = Math.floor((e.y + 3) / TS);
           if (e.life <= 0 || solidAt(tx, ty)) { e.dead = true; burstAt(e.x, e.y, { count: 3, color: e.color }); }
-        } else if (e.kind === 'pickup') e.t += dt;
+        } else if (e.kind === 'pickup') {
+          e.t += dt;
+          if (e.fly) {                                  // летящий бонус: синусоида + улёт за экран
+            e.x += e.fvx * dt;
+            e.y = e.baseY + Math.sin(e.t * 3) * TS * 0.6;
+            e.life -= dt;
+            if (e.life <= 0 || e.x < cam.x - viewW || e.x > cam.x + viewW * 2) e.dead = true;
+          }
+        }
       }
 
       // ── столкновения ──
@@ -864,7 +931,14 @@ Engine.register('platformer', function (engine, cfg) {
           if (e.friendly) {
             for (let j = 0; j < ents.length; j++) {
               const t = ents[j];
-              if (t.kind === 'enemy' && !t.dead && overlap(e, t)) { damageEnemy(t, e.dmg, Math.sign(e.vx) * 120); e.dead = true; break; }
+              if (t.kind === 'enemy' && !t.dead && overlap(e, t)) {
+                if (e.pierce) {                       // пробивающий: бьёт каждого один раз, летит дальше
+                  if (!e.hitSet) e.hitSet = [];
+                  if (e.hitSet.indexOf(t) !== -1) continue;
+                  e.hitSet.push(t);
+                  damageEnemy(t, e.dmg, Math.sign(e.vx) * 120);
+                } else { damageEnemy(t, e.dmg, Math.sign(e.vx) * 120); e.dead = true; break; }
+              }
             }
           } else if (overlap(e, player)) { hurtPlayer(e.dmg, Math.sign(e.vx) || 1); e.dead = true; }
         } else if (e.kind === 'pickup' && overlap(player, e)) applyPickup(e);
@@ -966,6 +1040,14 @@ Engine.register('platformer', function (engine, cfg) {
 
       // игрок (мигает в i-frames)
       if (!(player.inv > 0 && Math.floor(time * 14) % 2 === 0)) drawEnt(ctx, player, PLDEF, true);
+      // вспышка у ствола при выстреле
+      if (player.shootT > 0.06) {
+        const wNow = curWeapon();
+        ctx.fillStyle = (wNow && wNow.color) || '#fff';
+        const mx = player.x + player.w / 2 + player.facing * (player.w * 0.75 + 3);
+        const my = player.y + player.h * 0.45;
+        ctx.beginPath(); ctx.arc(mx, my, 2.6 + Math.random() * 1.5, 0, 7); ctx.fill();
+      }
       // замах меча
       if (player.attackT > 0) {
         const hb2 = meleeHitbox();
@@ -1010,12 +1092,21 @@ Engine.register('platformer', function (engine, cfg) {
       ctx.fillStyle = '#fff'; ctx.font = 'bold 16px ' + FONT; ctx.textAlign = 'left';
       ctx.fillText(String(MODE === 'runner' ? engine.score + ' м' : engine.score), W - 52, 22);
       // жизни/ключи/оружие
-      ctx.font = 'bold 12px ' + FONT; ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.font = 'bold 12px ' + FONT; ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.textAlign = 'left';
       let info = [];
       if (MODE !== 'runner') info.push('✚' + lives);
       if (player.keysN > 0) info.push('🔑' + player.keysN);
-      if (player.weapons.length) info.push(player.weapons[player.weaponIdx]);
+      if (player.weapons.length || player.tempWeapon) info.push(curWeaponName());
       ctx.fillText(info.join('  '), 14, 34 + hs + (stam() ? 10 : 0));
+      // временное оружие: полоса оставшегося времени под именем
+      if (player.tempWeapon) {
+        const tw = WEAPONS[player.tempWeapon.id] || {};
+        const frac = Math.max(0, Math.min(1, player.tempWeapon.t / (player.tempWeapon.total || 10)));
+        const bx2 = 14, by2 = 44 + hs + (stam() ? 10 : 0), bw2 = 110, bh2 = 8;
+        ctx.fillStyle = 'rgba(0,0,0,0.45)'; engine.rr(bx2, by2, bw2, bh2, 4); ctx.fill();
+        ctx.fillStyle = tw.color || '#ffd75e'; engine.rr(bx2, by2, Math.max(2, bw2 * frac), bh2, 4); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1; engine.rr(bx2, by2, bw2, bh2, 4); ctx.stroke();
+      }
       // полоса босса
       const boss = ents.find(e => e.kind === 'enemy' && e.boss && e.bossActive && !e.dead);
       if (boss) {
@@ -1071,13 +1162,16 @@ Engine.register('platformer', function (engine, cfg) {
       return { mode: MODE, levelIdx: levelIdx, lives: lives,
         player: { x: player.x, y: player.y, vx: player.vx, vy: player.vy, hp: player.hp, coins: player.coins,
                   onGround: player.onGround, keysN: player.keysN, weapons: player.weapons.slice(), abilities: Object.assign({}, player.abilities),
-                  weaponIdx: player.weaponIdx, attackCd: player.attackCd, attackT: player.attackT, climbing: player.climbing, inv: player.inv, facing: player.facing },
+                  weaponIdx: player.weaponIdx, attackCd: player.attackCd, attackT: player.attackT, climbing: player.climbing, inv: player.inv, facing: player.facing,
+                  tempWeapon: player.tempWeapon ? { id: player.tempWeapon.id, t: player.tempWeapon.t } : null },
         cam: { x: cam.x, y: cam.y },
         counts: ents.reduce(function (m, e) { m[e.kind] = (m[e.kind] || 0) + 1; return m; }, {}),
         boss: (function () { const b = ents.find(e => e.boss); return b ? { hp: b.hp, active: b.bossActive } : null; })(),
         runnerDist: runnerDist, tCols: tCols, tRows: tRows,
         exits: ents.filter(e => e.kind === 'exit').map(e => ({ x: e.x, y: e.y })),
-        enemies: ents.filter(e => e.kind === 'enemy').map(e => ({ id: e.id, x: Math.round(e.x), y: Math.round(e.y), hp: e.hp, boss: !!e.boss, active: !!e.bossActive })) };
+        enemies: ents.filter(e => e.kind === 'enemy').map(e => ({ id: e.id, x: Math.round(e.x), y: Math.round(e.y), hp: e.hp, boss: !!e.boss, active: !!e.bossActive })),
+        pickups: ents.filter(e => e.kind === 'pickup').map(e => ({ x: Math.round(e.x), y: Math.round(e.y), type: e.def.pickup, weapon: e.def.weapon || null, fly: !!e.fly })),
+        projs: ents.filter(e => e.kind === 'proj').map(e => ({ x: Math.round(e.x), y: Math.round(e.y), vx: Math.round(e.vx), friendly: e.friendly, pierce: !!e.pierce })) };
     },
     _press: function (k) { vkeys[k] = true; },
     _release: function (k) { vkeys[k] = false; },
@@ -1131,6 +1225,16 @@ Engine.register('platformer', function (engine, cfg) {
       ctx.strokeStyle = col; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(x + s * 0.35, y + s * 0.4, s * 0.2, 0, 7); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(x + s * 0.5, y + s * 0.5); ctx.lineTo(x + s * 0.85, y + s * 0.85); ctx.moveTo(x + s * 0.72, y + s * 0.72); ctx.lineTo(x + s * 0.85, y + s * 0.6); ctx.stroke();
+    } else if (d.pickup === 'weapon' && (e.fly || d.label)) {
+      // летящий бонус оружия — светящаяся капсула с буквой (Contra-style)
+      ctx.save();
+      ctx.shadowColor = col; ctx.shadowBlur = 6;
+      ctx.fillStyle = col; rrPath(ctx, x, y + s * 0.12, s, s * 0.76, s * 0.3); ctx.fill();
+      ctx.restore();
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1.2; rrPath(ctx, x, y + s * 0.12, s, s * 0.76, s * 0.3); ctx.stroke();
+      ctx.fillStyle = '#111'; ctx.font = 'bold ' + Math.round(s * 0.55) + 'px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(d.label || 'W', x + s / 2, y + s / 2 + 0.5);
     } else { // способность/оружие — ромб
       ctx.fillStyle = col;
       ctx.beginPath(); ctx.moveTo(x + s / 2, y); ctx.lineTo(x + s, y + s / 2); ctx.lineTo(x + s / 2, y + s); ctx.lineTo(x, y + s / 2); ctx.closePath(); ctx.fill();
