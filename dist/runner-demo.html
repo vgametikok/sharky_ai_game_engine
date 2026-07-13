@@ -10,7 +10,7 @@
 <canvas id="c"></canvas>
 <script>
 'use strict';
-const CONFIG = {"genre":"platformer","meta":{"title":"Runner Demo"},"theme":{"accent":"#7ce0ff","bgTop":"#1d2a4a","bgBottom":"#0b1020","font":"'Segoe UI', system-ui, sans-serif","labels":{"over":"РАЗБИЛСЯ","again":"Тап — заново","scoreUnit":"метров","hint":"Тапай, чтобы прыгать"}},"rules":{"mode":"untimed"},"platformer":{"tileSize":16,"viewTilesX":15,"mode":"runner","physics":{"gravity":1600,"jumpVel":440},"player":{"w":0.7,"h":0.95,"hp":1,"lives":1,"color":"#7ce0ff","weapons":[],"abilities":{"doubleJump":true}},"runner":{"speed":120,"ramp":4,"maxSpeed":250,"chunks":[{"map":["                ","                ","                ","                ","                ","                ","                ","                ","     C  C       ","################","################","################"]},{"map":["                ","                ","                ","                ","                ","          C     ","        C   C   ","                ","                ","#####      #####","#####      #####","#####      #####"]},{"map":["                ","                ","                ","                ","                ","                ","      C C       ","                ","     ^^^        ","################","################","################"]},{"map":["                ","                ","                ","                ","         C C    ","                ","        ####    ","        ####    ","  C             ","################","################","################"]},{"map":["                ","                ","                ","                ","                ","                ","                ","   C       C    ","        g       ","######  ########","######  ########","######  ########"]}]},"enemies":{"walker":{"w":0.8,"h":0.8,"hp":1,"dmg":1,"speed":26,"ai":"patrol","stompable":true,"score":15,"color":"#e07b5a"}},"legend":{"#":{"tile":true,"solid":true,"color":"#3f6d8e"},"^":{"tile":true,"hazard":1,"color":"#d94f4f"},"C":{"pickup":"coin","value":5,"color":"#ffe08a"},"g":{"enemy":"walker"}}}};
+const CONFIG = {"genre":"platformer","meta":{"title":"Runner Demo"},"theme":{"accent":"#7ce0ff","bgTop":"#1d2a4a","bgBottom":"#0b1020","font":"'Segoe UI', system-ui, sans-serif","labels":{"over":"РАЗБИЛСЯ","again":"Тап — заново","scoreUnit":"метров","hint":"Тапай, чтобы прыгать"}},"rules":{"mode":"untimed"},"platformer":{"tileSize":16,"viewTilesX":15,"mode":"runner","physics":{"gravity":1600,"jumpVel":440},"player":{"w":0.7,"h":0.95,"hp":1,"lives":1,"color":"#7ce0ff","weapons":[],"abilities":{"doubleJump":true}},"runner":{"speed":120,"ramp":4,"maxSpeed":250,"chunks":[{"map":["                ","                ","                ","                ","                ","                ","                ","                ","     C  C       ","################","################","################"]},{"map":["                ","                ","                ","                ","                ","          C     ","        C   C   ","                ","                ","#####      #####","#####      #####","#####      #####"]},{"map":["                ","                ","                ","                ","                ","                ","      C C       ","                ","     ^^^        ","################","################","################"],"minM":30},{"map":["                ","                ","                ","                ","                ","       M        ","                ","   C        B   ","                ","################","################","################"],"weight":1},{"map":["                ","                ","                ","                ","         C C    ","                ","        ####    ","        ####    ","  C             ","################","################","################"]},{"map":["                ","                ","                ","                ","                ","                ","                ","   C       C    ","        g       ","######  ########","######  ########","######  ########"]}]},"enemies":{"walker":{"w":0.8,"h":0.8,"hp":1,"dmg":1,"speed":26,"ai":"patrol","stompable":true,"score":15,"color":"#e07b5a"}},"legend":{"#":{"tile":true,"solid":true,"color":"#3f6d8e"},"^":{"tile":true,"hazard":1,"color":"#d94f4f"},"C":{"pickup":"coin","value":5,"color":"#ffe08a"},"M":{"pickup":"magnet","dur":8,"color":"#e06bd0"},"B":{"pickup":"boost","dur":3,"color":"#7ce07c"},"g":{"enemy":"walker"}}}};
 /* ============================================================
    SHARKY GAME ENGINE — universal core (core.js)
    ------------------------------------------------------------
@@ -726,8 +726,21 @@ Engine.register('platformer', function (engine, cfg) {
   function appendChunks(untilTx) {
     let guard = 0;
     while (rGenX < untilTx && guard++ < 60) {
-      // первый чанк — всегда chunks[0] (безопасная площадка под спавн)
-      const ch = RUN.chunks[rGenX === 0 ? 0 : (Math.random() * RUN.chunks.length) | 0];
+      // первый чанк — всегда chunks[0]; далее — взвешенный выбор по дистанции
+      // (chunk.minM/maxM в метрах: лёгкие в начале, сложные позже; weight — частота)
+      let ch;
+      if (rGenX === 0) ch = RUN.chunks[0];
+      else {
+        const m = Math.floor(rGenX);   // текущая дистанция в тайлах≈метрах
+        const cands = [];
+        for (let ci = 0; ci < RUN.chunks.length; ci++) {
+          const c2 = RUN.chunks[ci];
+          if (c2.minM != null && m < c2.minM) continue;
+          if (c2.maxM != null && m > c2.maxM) continue;
+          for (let wi = 0; wi < (c2.weight || 1); wi++) cands.push(c2);
+        }
+        ch = cands.length ? cands[(Math.random() * cands.length) | 0] : RUN.chunks[(Math.random() * RUN.chunks.length) | 0];
+      }
       const rows = ch.map, w = rows[0].length;
       for (let ty = 0; ty < rows.length; ty++) for (let tx = 0; tx < w; tx++) {
         const c = rows[ty][tx] || ' ';
@@ -959,6 +972,31 @@ Engine.register('platformer', function (engine, cfg) {
 
     const auto = MODE === 'runner';
     const wantL = !auto && cur.left, wantR = auto || cur.right;
+
+    // ── раннер-полосы (Subway Surfers): 3 дорожки, свайпы ↑/↓ ──
+    if (auto && RUN.lanes) {
+      const rows = RUN.lanes.rows || [3, 6, 9];
+      if (p.lane == null) p.lane = (rows.length / 2) | 0;
+      const tyL = rows[p.lane] * TS - p.h;
+      p.vy = 0; p.y += (tyL - p.y) * Math.min(1, dt * 12);
+      p.vx = runnerSpeed;
+      moveBody(p, dt, { noOneWay: true });
+      if (p.hitWall) { killPlayer(); return; }   // врезался в препятствие
+      return afterMove(dt);
+    }
+
+    // ── подкат (раннер): свайп вниз / удержание down ──
+    if (auto) {
+      const baseH = PLDEF.h * TS;
+      if (p.slideT > 0) {
+        p.slideT -= dt;
+        if (p.slideT <= 0 && p.h < baseH) { p.y -= baseH - p.h; p.h = baseH; }
+      } else if ((cur.down || p.slideReq) && p.onGround && p.h >= baseH) {
+        p.slideT = 0.6; const nh = baseH * 0.55;
+        p.y += p.h - nh; p.h = nh; sfx('dash');
+      }
+      p.slideReq = false;
+    }
 
     // ── крюк-кошка (Dead Cells): полёт к точке / вис ──
     if (p.grap) {
@@ -1217,6 +1255,11 @@ Engine.register('platformer', function (engine, cfg) {
     if (p.inv > 0 || engine.state !== 'playing') return;
     combo = 0;                                        // серия убийств прервана уроном
     if (chTrack) chTrack.damaged = true;              // челлендж «без урона»
+    if (p.shield) {                                   // одноразовый щит (раннер-бустер)
+      p.shield = false; p.inv = 1.0;
+      sfx('hit'); burstAt(p.x + p.w / 2, p.y + p.h / 2, { count: 10, color: '#7ce0ff' });
+      return;
+    }
     if (p.suit) {                                     // костюм принимает удар на себя (Марио)
       p.suit = null; p.inv = 1.2;
       shake(3, 0.2); sfx('hurt');
@@ -1454,6 +1497,9 @@ Engine.register('platformer', function (engine, cfg) {
       case 'suit': p.suit = d.suit; toast(d.label || ('Костюм: ' + d.suit)); sfx('power'); break;
       case 'rope': p.ropes = (p.ropes || 0) + (d.value || 3); sfx('coin'); break;
       case 'star': stars++; toast('⭐ Звезда!'); sfx('power'); break;
+      case 'magnet': p.magnetT = d.dur || 8; toast('🧲 Магнит!'); sfx('power'); break;
+      case 'boost': p.boostT = d.dur || 3; p.inv = Math.max(p.inv, d.dur || 3); toast('⚡ Ускорение!'); sfx('power'); break;
+      case 'shield': p.shield = true; toast('🛡 Щит!'); sfx('power'); break;
       case 'resource': {
         const id = d.res || 'res';
         p.res[id] = (p.res[id] || 0) + (d.value || 1);
@@ -1632,7 +1678,8 @@ Engine.register('platformer', function (engine, cfg) {
         const dx = (player.x + player.w / 2) - (tr.tx + 0.5) * TS;
         if (sameRow && Math.sign(dx) === dir && Math.abs(dx) < (d.range || 8) * TS) {
           tr.cd = d.cooldown || 2;
-          fireProjectile({ x: (tr.tx + dir * 0.6) * TS, y: tr.ty * TS, w: TS, h: TS, facing: dir },
+          // спавн стрелы за пределами тайла ловушки, иначе умрёт о него же
+          fireProjectile({ x: (tr.tx + dir * 1.25) * TS, y: tr.ty * TS, w: TS, h: TS, facing: dir },
                          { speed: d.projSpeed || 220, dmg: d.dmg || 1, life: 1.6 }, false, dir > 0 ? 0 : Math.PI);
           sfx('eshoot');
         }
@@ -1648,9 +1695,21 @@ Engine.register('platformer', function (engine, cfg) {
           hurtPlayer(pd.dmg, Math.sign(dxp) || 1);
       }
 
-      // раннер: разгон и дистанция
+      // раннер: разгон и дистанция (+бустеры)
       if (MODE === 'runner') {
         runnerSpeed = Math.min(RUN.maxSpeed, runnerSpeed + RUN.ramp * dt);
+        if (player.boostT > 0) { player.boostT -= dt; runnerSpeed *= 1.8; }   // временное ускорение
+        if (player.magnetT > 0) {                                             // магнит: монеты слетаются
+          player.magnetT -= dt;
+          for (let i = 0; i < ents.length; i++) {
+            const e = ents[i];
+            if (e.kind === 'pickup' && e.def.pickup === 'coin' && !e.fly) {
+              const dx = (player.x + player.w / 2) - (e.x + e.w / 2), dy = (player.y + player.h / 2) - (e.y + e.h / 2);
+              const d2 = Math.hypot(dx, dy);
+              if (d2 < TS * 6 && d2 > 1) { e.x += dx / d2 * 260 * dt; e.y += dy / d2 * 260 * dt; }
+            }
+          }
+        }
         const m = Math.floor(player.x / TS);
         if (m > runnerDist) { runnerDist = m; engine.setScore(runnerDist); }
         appendChunks(Math.floor((cam.x + viewW * 2.5) / TS));
@@ -2154,12 +2213,24 @@ Engine.register('platformer', function (engine, cfg) {
         }
         return;
       }
-      if (MODE === 'runner') { vkeys.jump = true; return; }
+      if (MODE === 'runner') { if (!RUN.lanes) vkeys.jump = true; return; }
       const b = btnAt(p.x, p.y);
       if (b) { ptrBtn[p.id] = b.id; vkeys[b.id] = true; }
     },
     pointerUp: function (e) {
-      if (MODE === 'runner') { vkeys.jump = false; return; }
+      if (MODE === 'runner') {
+        vkeys.jump = false;
+        if (e.dist > 28) {
+          if (RUN.lanes) {   // свайп меняет полосу
+            const rows = RUN.lanes.rows || [3, 6, 9];
+            if (player.lane == null) player.lane = (rows.length / 2) | 0;
+            if (e.dir === 'up') player.lane = Math.max(0, player.lane - 1);
+            else if (e.dir === 'down') player.lane = Math.min(rows.length - 1, player.lane + 1);
+            sfx('swap');
+          } else if (e.dir === 'down') player.slideReq = true;   // свайп вниз = подкат
+        }
+        return;
+      }
       const id = ptrBtn[e.id];
       if (id) { delete ptrBtn[e.id]; vkeys[id] = false; }
     },
