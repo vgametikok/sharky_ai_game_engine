@@ -1,3 +1,408 @@
+<!DOCTYPE html><html lang="ru"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Match-3 Deluxe</title>
+<style>
+  :root { --ac:#e7b44c; }
+  html,body{margin:0;width:100vw;height:100vh;overflow:hidden;touch-action:none;background:#000;}
+  canvas{display:block;width:100%;height:100%;}
+</style></head><body>
+<canvas id="c"></canvas>
+<script>
+'use strict';
+const CONFIG = {"genre":"match3","meta":{"title":"Match-3 Deluxe"},"theme":{"accent":"#7ce0ff","bgTop":"#2a2014","bgBottom":"#15100a","hudText":"#f4e3b0","font":"Georgia, 'Times New Roman', serif","hudIcon":"goldenCoin","labels":{"over":"ХОДЫ КОНЧИЛИСЬ","win":"ПОБЕДА!","again":"Тап — заново","scoreUnit":"уровней"}},"rules":{"mode":"untimed","cols":7,"rows":8,"minRun":3,"clearDur":0.18,"goal":15,"typeCount":5,"pool":["heart","bluePotion","greenApple","goldenCoin","skull","monsterEye"],"moveLimit":20,"specials":true,"ice":{"count":6,"layers":2}},"tileNames":["heart","bluePotion","greenApple","goldenCoin","skull","monsterEye"],"assets":{"heart":"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","bluePotion":"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","greenApple":"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","goldenCoin":"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","skull":"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","monsterEye":"iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAFaUlEQVRYhe2WT4hdVx3HP79zzr333fvem8w0k9qAZNGNVHCRlkqg0YKLLlwJ4kK3UklF0zLtQknrQguKoAs3LqyiFneKoGBBUmwWCu5EEP+AUhKNyUwyk7x3590/58+vixvTycwbMgGhmx64cO+55/y+n/P93XN+F95v73GTvQ+qetR5hw2UQ/rvHSTvDnNHVdwr+tUnDUYEC4hAJiAGLvwh7gU7Gsw9Coc7oBunhdwKxggPlTlZDkaEzIBFsUZo20ifEiLK878Lh0LsdeAoALrxuLA+yXFGyDLD0y99H1IYLk1ICpAif3/9FUyCuvX0PnLuol8K8SAA+uJpYX1a8ImXvoegqG9BA2jAAGhAUoQUkRTvBBfe/sV3uT5ree7iQSeOCqAvPi48PMk5e/7bw2pDi8YO9R4xCcMgakxCYgKNGCwoiDiuvPEa17Ybzu1Lx1EAdOP0IP7Uua+jsYPUk/pdSD3CYLsR+MdWw2MnHBo9FgZxFXAZQs5/3vwZV7dbvrgH4n4AeuFJw0qZcebzLw+WhwZSh4YWUgcooh4jwp+u7PLEqRFoRFIagqcE0YAxKCM2//hrLm82nL8U7ujfZxtagbVpjvgZhA58Q/INEEnqMZLAB37/zxkpBS79WfnYh8cYVR771DcA+OvPvwZRUHryKqOs/DKp5QDjkcUIvP3Ga+SVw+WO0cRx7NGPkmI7rJDI7ds1IUXQCMGBJFQSAvgbf6P3PbFJJAQ5ZIfvT4F+86zj+LGCssoZjTJcbrCFkOcZYi1JFQF+9NYmUUFUEQEVeO6ZR7ACdvLwELBPRDXUV/5F30aubu3ypYvdPTk44IAxUFWOaqXAFY4sMzhnKdcLSBC7BBZiUKLq3eNRFJzLMLkgaQcxQrtoCJ3H5IbURXTJuXQAIDPCyvEJ1VrBaJJTVA7rHF3dYzMhWjtYDaQ0BEwoBsGMBOOGvuiV6pExsUv4uoPcwFZzFACLMzKwhgC9Q0xkNC0w9t0VW8MdCLAqKFCMc0SUlECcElpPN+/p2shi5ofCcT+AcWnJcsuocmS5IysdbjwUn+J4SfCKhkDmBIlK1CH/IuBKi7Eg1tLe8kSTkMwhvRIx6JLKYPZ3lLnFGSWzQl5Ziolj9dQqx049BD7hDGS541uvnmGUCWUhFLnw6sunySc5kmVoEMbrJSsnx5jMIIBGZVmp2Q8gn/3ljHanpZgWjE9WTD44xdc9oWvIKktWWqq1MYJlrbSslJZpZSmcoxqXFFmOdYa+7mm3A9P1gmqtZLfuef63C9i385aeA8lHuhs1RkFbpVgZgoKhXF2hv12TZY5p6YiaUAVrHcEH8lFG8D1iDeCpt3rq7QU+pWVSB1MAQz5Dm4iNR+4IlKtTqtVj+HqByTKKScULX3mKaeF4YeMMeeEgKX3jyYqCvHSgCe8DvguEsFR/KYB88vWb1NfmhLYntj0nz36H8aMXaOYzhmIrWDGgirWAQhKBBCkF2nlDs9NhCoNfBK5f3eXLv5kfsP9QBwB55ic3mV++hYwsofVoAtLwIeWTkm7eoiSe3fg4MUa6ukNyg+8joUv4LjC7tuDalTnnfjVbKn6gc9kPyaVnT7D+kQ+QH6/IVwts5hiNx/jdDlHBFI7FTkPX9iRVFtsLus7T7HRcv3ybz/1064DO3mp4mAN3xz79gy22/nKDxWZNc2NBd6tj8qFX6HtP23a0i5a2aWjrlnbesLvTMttcsPXv+VLxB3Xg7qu3vnACWzjy1RGjE2OySY4aiyksi5sLujpw679zujYQQuIzP7x+qPiD/pTeff2/mzfPnyQFJQExKT5ACMqnf7x56OL+HwBLYfbHPspkWVIT3m/vWXsHAfiilOBKmVAAAAAASUVORK5CYII="}};
+/* ============================================================
+   SHARKY GAME ENGINE — universal core (core.js)
+   ------------------------------------------------------------
+   Общий слой для всех мини-игр ленты Sharky:
+     • canvas + DPR + resize/layout
+     • игровой цикл (loop/update/render)
+     • ввод: pointer (tap/swipe) + клавиатура
+     • звук (beep), частицы (burst)
+     • загрузка base64-ассетов
+     • тематический HUD (счёт + полоса таймера) и экран Game Over
+     • ПРОТОКОЛ Sharky (postMessage): принимает init/start/pause,
+       шлёт ready/score/gameover; автостарт ВНЕ ленты по таймеру.
+
+   Игра = это ядро + один МОДУЛЬ-СЦЕНА (механика, регистрируется
+   через Engine.register) + объект CONFIG (тема/правила/ассеты).
+   Сборщик (build.js) встраивает все три части в один .html —
+   игры в Sharky крутятся в sandbox-iframe через srcdoc, поэтому
+   внешние <script> и относительные ассеты недопустимы.
+
+   ── КОНТРАКТ СЦЕНЫ ──
+   Engine.register('genre', function(engine, cfg){
+     return {
+       init(){},          // одноразовая настройка (ассеты+геометрия готовы)
+       reset(){},         // (пере)собрать игровое состояние; на каждый запуск
+       layout(L){},       // пересчёт геометрии из {W,H,headerH}
+       update(dt){},      // продвинуть механику (таймер ведёт ЯДРО)
+       render(ctx){},     // нарисовать поле (фон/HUD/оверлей рисует ЯДРО)
+       pointerDown(p){},  // p = {x,y} в пикселях canvas
+       pointerUp(e){},    // e = {x,y,downX,downY,dx,dy,dist,dir}
+       pointerMove(p){},
+       key(k){},          // k = event.key
+     };
+   });
+
+   ── API ЯДРА для сцены (engine.*) ──
+     ctx, W, H, headerH, cfg, theme, rules, score   (только чтение)
+     img(name) -> HTMLImageElement
+     beep(freq,dur,type,vol)
+     burst(x,y,opts)                  // частицы (по умолчанию — как в match3)
+     addScore(n) / setScore(v)        // меняет счёт + шлёт его в ленту
+     gameOver()                       // завершить забег (смерть). Таймер тоже завершает.
+     rr(x,y,w,h,r) / accent()         // помощники рисования
+   ============================================================ */
+(function (global) {
+  'use strict';
+
+  // ── canvas / контекст ──
+  let cv, ctx;
+  let W = 360, H = 580, headerH = 70, dpr = 1;
+
+  // ── конфиг / сцена ──
+  let cfg = null, theme = {}, rules = {}, scene = null;
+
+  // ── состояние забега ──
+  let state = 'loading';            // loading | playing | over
+  let running = false, raf = 0, last = 0;
+  let score = 0, best = 0, timeLeft = 0, duration = 0, timed = false;
+  let assetsReady = false, pendingStart = false, gotShell = false;
+
+  // ── ассеты ──
+  const IMG = {}; let imgTotal = 0, imgLoaded = 0;
+
+  // ── звук ──
+  let audioCtx = null;
+
+  // ── частицы ──
+  const parts = [];
+
+  // ── ввод ──
+  let downX = 0, downY = 0, hasDown = false;
+  const pointers = {};        // pointerId → {x,y} точки нажатия (мультитач)
+  const keys = new Set();     // зажатые клавиши (для платформеров и т.п.)
+  const GAME_KEYS = [' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+
+  // ── объект, который получает сцена ──
+  const api = {
+    get ctx() { return ctx; },
+    get W() { return W; },
+    get H() { return H; },
+    get headerH() { return headerH; },
+    get cfg() { return cfg; },
+    get theme() { return theme; },
+    get rules() { return rules; },
+    get score() { return score; },
+    get timeLeft() { return timeLeft; },
+    get duration() { return duration; },
+    get state() { return state; },
+    get keys() { return keys; },          // живой Set зажатых клавиш
+    img: function (name) { return IMG[name]; },
+    beep: beep,
+    burst: burst,
+    addScore: addScore,
+    setScore: setScore,
+    gameOver: gameOver,
+    resetTimer: resetTimer,
+    rr: rr,
+    accent: accent,
+  };
+
+  const Engine = {
+    scenes: {},
+    register: function (name, factory) { this.scenes[name] = factory; },
+    boot: boot,
+  };
+  global.Engine = Engine;
+
+  // Диагностика (можно дёрнуть из консоли): текущее состояние движка.
+  Engine.debug = function () {
+    return { state: state, running: running, assetsReady: assetsReady, pendingStart: pendingStart,
+             gotShell: gotShell, imgLoaded: imgLoaded, imgTotal: imgTotal, hasScene: !!scene,
+             W: W, H: H };
+  };
+  // Принудительный одиночный кадр (для тестов в скрытой вкладке, где rAF не тикает).
+  Engine.renderOnce = function () { if (scene && assetsReady) render(); };
+
+  // ════════════════════════════════════════════ BOOT
+  function boot(config) {
+    cfg = config; theme = config.theme || {}; rules = config.rules || {};
+    duration = rules.duration || 60;
+    timed = (rules.mode || 'timed') === 'timed';
+    cv = document.getElementById('c'); ctx = cv.getContext('2d');
+    if (theme.accent) document.documentElement.style.setProperty('--ac', theme.accent);
+    if (theme.bgBottom || theme.bgTop) document.body.style.background = theme.bgBottom || theme.bgTop;
+
+    const factory = Engine.scenes[config.genre];
+    if (!factory) { console.error('Engine: нет сцены для жанра', config.genre); return; }
+    scene = factory(api, config);
+    Engine._scene = scene;   // для отладки/тестов
+
+    window.addEventListener('resize', resize);
+    bindInput();
+    bindProtocol();
+    window.addEventListener('load', function () {
+      loadImages(config.assets || {});
+      // Автостарт ТОЛЬКО вне Sharky. В ленте всегда приходит init -> gotShell=true.
+      setTimeout(function () {
+        if (!gotShell) { if (assetsReady) start(); else pendingStart = true; }
+      }, 400);
+    });
+  }
+
+  // ════════════════════════════════════════════ ГЕОМЕТРИЯ
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = cv.clientWidth || 360; H = cv.clientHeight || 580;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingEnabled = false;            // чёткий пиксель-арт
+    headerH = Math.max(48, Math.min(96, H * 0.13));
+    if (scene && scene.layout) scene.layout({ W: W, H: H, headerH: headerH });
+  }
+
+  // ════════════════════════════════════════════ АССЕТЫ
+  function loadImages(map) {
+    const names = Object.keys(map);
+    imgTotal = names.length; imgLoaded = 0;
+    if (imgTotal === 0) { onReady(); return; }
+    names.forEach(function (n) {
+      const im = new Image();
+      im.onload = im.onerror = function () { imgLoaded++; if (imgLoaded >= imgTotal) onReady(); };
+      const v = map[n];
+      // поддержка готовых data-URL (jpg/webp/png) и «сырого» base64 (по умолч. png)
+      im.src = (typeof v === 'string' && v.lastIndexOf('data:', 0) === 0) ? v : ('data:image/png;base64,' + v);
+      IMG[n] = im;
+    });
+  }
+  function onReady() {
+    resize();
+    try {
+      if (scene.init) scene.init();
+      newRun();
+    } catch (e) { console.error('Engine onReady scene error:', e); }
+    assetsReady = true;
+    try { const v = getComputedStyle(document.documentElement).getPropertyValue('--ac').trim(); if (v) theme.accent = v; } catch (e) {}
+    send({ type: 'ready' });
+    if (pendingStart) start();
+  }
+
+  // ════════════════════════════════════════════ ЖИЗНЕННЫЙ ЦИКЛ
+  function newRun() {
+    score = 0; timeLeft = duration; state = 'playing'; parts.length = 0; overLabel = null;
+    if (scene.reset) scene.reset();
+    send({ type: 'score', value: 0 });
+  }
+  function start() {
+    if (!assetsReady) { pendingStart = true; return; }
+    if (running) return;
+    running = true; last = performance.now();
+    if (audioCtx && audioCtx.state !== 'running') audioCtx.resume();
+    raf = requestAnimationFrame(loop);
+  }
+  function pause() {
+    running = false; cancelAnimationFrame(raf);
+    if (audioCtx && audioCtx.state === 'running') audioCtx.suspend();
+  }
+  function restart() {
+    if (audioCtx && audioCtx.state !== 'running') audioCtx.resume();
+    newRun();
+  }
+  function loop(t) {
+    if (!running) return;
+    const dt = Math.min((t - last) / 1000, 0.05); last = t;
+    try { update(dt); render(); }
+    catch (e) { running = false; console.error('Engine loop error:', e); return; }
+    raf = requestAnimationFrame(loop);
+  }
+  function update(dt) {
+    if (state === 'playing') {
+      if (timed) { timeLeft -= dt; if (timeLeft <= 0) { timeLeft = 0; gameOver(); } }
+      if (scene.update) scene.update(dt);
+    }
+    updateParts(dt);
+  }
+  let overLabel = null;   // надпись на экране конца (переопределяет labels.over, напр. «ПОБЕДА»)
+  function gameOver(opts) {
+    if (state === 'over') return;
+    overLabel = (opts && opts.label) || null;
+    state = 'over';
+    send({ type: 'gameover', value: score });
+  }
+  // Сброс таймера раунда (для пораундовых игр). Без аргумента — на полную длительность.
+  function resetTimer(sec) { if (sec) duration = sec; timeLeft = duration; }
+
+  // ════════════════════════════════════════════ СЧЁТ
+  function addScore(n) { setScore(score + n); }
+  function setScore(v) {
+    score = v; if (score > best) best = score;
+    send({ type: 'score', value: score });
+  }
+
+  // ════════════════════════════════════════════ РЕНДЕР
+  function render() {
+    drawBg();
+    if (scene.render) scene.render(ctx);
+    drawParts();
+    if (scene.hud) scene.hud(ctx); else drawHUD();
+    if (state === 'over') drawOver();
+  }
+  function drawBg() {
+    const bg = theme.bgImage && IMG[theme.bgImage];
+    if (bg && bg.complete && bg.naturalWidth) {
+      // по ширине экрана, верх закреплён наверху, низ обрезается
+      const dh = bg.naturalHeight * (W / bg.naturalWidth);
+      ctx.drawImage(bg, 0, 0, W, dh);
+      if (dh < H) { ctx.fillStyle = theme.bgBottom || '#111'; ctx.fillRect(0, dh, W, H - dh); }
+    } else {
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, theme.bgTop || '#222'); g.addColorStop(1, theme.bgBottom || '#111');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    }
+  }
+  function drawHUD() {
+    ctx.textBaseline = 'middle';
+    const cy = headerH / 2;
+    const font = theme.font || "Georgia, serif";
+    let textX = 16;
+    const ico = theme.hudIcon && IMG[theme.hudIcon];
+    if (ico && ico.complete) {
+      const ic = Math.min(34, headerH * 0.5);
+      ctx.drawImage(ico, 12, cy - ic / 2, ic, ic);
+      textX = 16 + ic;
+    }
+    ctx.fillStyle = theme.hudText || '#f4e3b0';
+    ctx.font = 'bold ' + Math.round(headerH * 0.34) + 'px ' + font;
+    ctx.textAlign = 'left'; ctx.fillText(String(score), textX, cy);
+    if (timed) {
+      const bx = W * 0.46, bw = W - bx - 14, by = cy - 7, bh = 14;
+      ctx.fillStyle = 'rgba(0,0,0,0.4)'; rr(bx, by, bw, bh, 7); ctx.fill();
+      const frac = Math.max(0, timeLeft / duration);
+      ctx.fillStyle = accent(); rr(bx, by, Math.max(2, bw * frac), bh, 7); ctx.fill();
+      ctx.strokeStyle = 'rgba(244,227,176,0.6)'; ctx.lineWidth = 1.5; rr(bx, by, bw, bh, 7); ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 12px ' + font; ctx.textAlign = 'center';
+      ctx.fillText(Math.ceil(timeLeft) + '', bx + bw / 2, by + bh / 2);
+    }
+  }
+  function drawOver() {
+    const L = theme.labels || {};
+    ctx.fillStyle = 'rgba(10,7,4,0.78)'; ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const font = theme.font || "Georgia, serif";
+    ctx.fillStyle = accent(); ctx.font = 'bold ' + Math.round(W * 0.085) + 'px ' + font;
+    ctx.fillText(overLabel || L.over || 'GAME OVER', W / 2, H * 0.4);
+    ctx.fillStyle = theme.hudText || '#f4e3b0'; ctx.font = 'bold ' + Math.round(W * 0.13) + 'px ' + font;
+    ctx.fillText(String(score), W / 2, H * 0.52);
+    ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.font = Math.round(W * 0.045) + 'px ' + font;
+    ctx.fillText(L.scoreUnit || 'points', W / 2, H * 0.585);
+    ctx.fillStyle = '#fff'; ctx.font = Math.round(W * 0.05) + 'px ' + font;
+    ctx.fillText(L.again || 'Tap to play again', W / 2, H * 0.7);
+  }
+  function rr(x, y, w, h, r) {
+    ctx.beginPath(); ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+  function accent() { return theme.accent || '#e7b44c'; }
+
+  // ════════════════════════════════════════════ ЧАСТИЦЫ
+  function burst(x, y, o) {
+    o = o || {};
+    if (parts.length > 140) return;
+    const count = o.count || 4, col = o.color || accent(), g = (o.gravity == null ? 300 : o.gravity);
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2, sp = 40 + Math.random() * 120;
+      parts.push({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 40,
+                   life: 0.5 + Math.random() * 0.3, t: 0, s: 2 + Math.random() * 3, g: g, col: col });
+    }
+  }
+  function updateParts(dt) {
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i]; p.t += dt; if (p.t >= p.life) { parts.splice(i, 1); continue; }
+      p.vy += p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+    }
+  }
+  function drawParts() {
+    for (let i = 0; i < parts.length; i++) {
+      const p = parts[i], a = Math.max(0, 1 - p.t / p.life);
+      ctx.globalAlpha = a; ctx.fillStyle = p.col;
+      ctx.fillRect(p.x - p.s / 2, p.y - p.s / 2, p.s, p.s);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ════════════════════════════════════════════ ЗВУК (после первого тапа)
+  function ensureAudio() {
+    if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  }
+  function beep(freq, dur, wtype, vol) {
+    if (!audioCtx || audioCtx.state !== 'running') return;
+    const t = audioCtx.currentTime;
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = wtype || 'square'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(Math.min(vol || 0.15, 0.6), t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(audioCtx.destination);
+    o.start(t); o.stop(t + dur + 0.03);
+  }
+
+  // ════════════════════════════════════════════ ВВОД
+  function localPt(e) {
+    const r = cv.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+  function bindInput() {
+    cv.addEventListener('pointerdown', function (e) {
+      ensureAudio(); if (audioCtx && audioCtx.state !== 'running') audioCtx.resume();
+      if (state === 'over') { restart(); return; }
+      const p = localPt(e); p.id = e.pointerId;
+      pointers[e.pointerId] = { x: p.x, y: p.y };
+      downX = p.x; downY = p.y; hasDown = true;   // совместимость со сценами без мультитача
+      if (scene.pointerDown) scene.pointerDown(p);
+    });
+    cv.addEventListener('pointerup', function (e) { endPointer(e, false); });
+    cv.addEventListener('pointercancel', function (e) { endPointer(e, true); });
+    cv.addEventListener('pointermove', function (e) {
+      if (scene.pointerMove) { const p = localPt(e); p.id = e.pointerId; scene.pointerMove(p); }
+    });
+    window.addEventListener('keydown', function (e) {
+      if (GAME_KEYS.indexOf(e.key) !== -1) e.preventDefault();
+      keys.add(e.key);
+      if (scene.key) scene.key(e.key);
+    });
+    window.addEventListener('keyup', function (e) { keys.delete(e.key); });
+    window.addEventListener('blur', function () { keys.clear(); });
+  }
+  function endPointer(e, cancelled) {
+    const start = pointers[e.pointerId]; delete pointers[e.pointerId];
+    if (state === 'over') { hasDown = false; return; }
+    const p = localPt(e);
+    const sx = start ? start.x : downX, sy = start ? start.y : downY;
+    const dx = p.x - sx, dy = p.y - sy, dist = Math.sqrt(dx * dx + dy * dy);
+    const dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+    if (scene.pointerUp) scene.pointerUp({ x: p.x, y: p.y, id: e.pointerId, downX: sx, downY: sy,
+      dx: dx, dy: dy, dist: dist, dir: dir, had: hasDown, cancelled: !!cancelled });
+    hasDown = false;
+  }
+
+  // ════════════════════════════════════════════ ПРОТОКОЛ SHARKY
+  function send(m) { try { parent.postMessage(m, '*'); } catch (e) {} }
+  function bindProtocol() {
+    window.addEventListener('message', function (e) {
+      const d = e.data || {};
+      if (d.type === 'init') {
+        gotShell = true;
+        if (d.accent) { theme.accent = d.accent; document.documentElement.style.setProperty('--ac', d.accent); }
+      } else if (d.type === 'start') { gotShell = true; start(); }
+      else if (d.type === 'pause') { gotShell = true; pause(); }
+    });
+  }
+
+})(typeof window !== 'undefined' ? window : this);
+
 /* ============================================================
    СЦЕНА: match-3 (match3.js)
    ------------------------------------------------------------
@@ -628,3 +1033,6 @@ Engine.register('match3', function (engine, cfg) {
     },
   };
 });
+
+Engine.boot(CONFIG);
+</script></body></html>
