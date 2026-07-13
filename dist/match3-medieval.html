@@ -85,6 +85,164 @@ const CONFIG = {"genre":"match3","meta":{"title":"Sharky Match-3 — Medieval"},
   const keys = new Set();     // зажатые клавиши (для платформеров и т.п.)
   const GAME_KEYS = [' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 
+  /* ═══════════ CONTROLS: универсальный слой управления (CONFIG.controls) ═══════════
+     Все схемы транслируются в ВИРТУАЛЬНЫЕ КЛАВИШИ → работают с любой сценой.
+     controls = {
+       scheme: 'joystick' | 'tapmove' | 'tapaction' | 'aim' | null(=только кнопки),
+       joystick: { side:'left', radius:0.09, deadzone:0.3 },
+       tapAction: 'jump',                     — что делает тап (схема tapaction)
+       aim: { fire:'attack' | false },        — держишь палец/мышь = огонь в ту сторону
+       buttons: [ {glyph:'▲', action:'jump'} | {glyph:'✕', key:'x'} … ]  — программируемые
+     }
+     Действие → клавиша: */
+  const ACT2KEY = { left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown',
+    jump: ' ', attack: 'x', fire: 'x', dash: 'c', hook: 'v', slow: 'g', swap: 'q', map: 'm', bomb: 'x', undo: 'z' };
+  const CTL = { axis: { x: 0, y: 0 }, aim: { x: 0, y: 0, active: false }, mouse: { x: 0, y: 0 },
+    playerScreen: null, scheme: null };
+  let ctlCfg = null, ctlBtns = [], joy = null, tapTarget = null, ctlHeld = {};
+  function actKey(b) { return b.key || ACT2KEY[b.action] || ' '; }
+  function ctlPress(key) { if (!keys.has(key)) { keys.add(key); if (scene && scene.key) scene.key(key); } }
+  function ctlRelease(key) { keys.delete(key); }
+  function initControls(c) {
+    ctlCfg = c || null;
+    if (!ctlCfg) return;
+    CTL.scheme = ctlCfg.scheme || null;
+    layoutCtlButtons();
+  }
+  function layoutCtlButtons() {
+    ctlBtns = [];
+    if (!ctlCfg || !ctlCfg.buttons) return;
+    const r = Math.min(W, H) * 0.075, m = r * 0.7;
+    for (let i = 0; i < ctlCfg.buttons.length; i++) {
+      const b = ctlCfg.buttons[i];
+      // свои координаты (в долях экрана) или авто-дуга справа снизу
+      const x = b.x != null ? b.x * W : W - m - r - (i % 2) * (r * 2.3);
+      const y = b.y != null ? b.y * H : H - m - r - Math.floor(i / 2) * (r * 2.3);
+      ctlBtns.push({ x: x, y: y, r: b.r ? b.r * Math.min(W, H) : r, glyph: b.glyph || '●', key: actKey(b), id: i });
+    }
+  }
+  function ctlDown(p) {   // true = событие съедено слоем управления
+    if (!ctlCfg) return false;
+    for (let i = 0; i < ctlBtns.length; i++) {
+      const b = ctlBtns[i];
+      if ((p.x - b.x) * (p.x - b.x) + (p.y - b.y) * (p.y - b.y) <= b.r * b.r * 1.45) {
+        ctlHeld[p.id] = b.key; ctlPress(b.key); return true;
+      }
+    }
+    const sch = CTL.scheme;
+    if (sch === 'joystick') {
+      const side = (ctlCfg.joystick && ctlCfg.joystick.side) || 'left';
+      const inZone = side === 'any' || (side === 'left' ? p.x < W * 0.55 : p.x > W * 0.45);
+      if (inZone && !joy) { joy = { id: p.id, cx: p.x, cy: p.y }; return true; }
+      return false;
+    }
+    if (sch === 'tapmove') { tapTarget = { x: p.x, y: p.y, id: p.id }; return true; }
+    if (sch === 'tapaction') {
+      const key = ACT2KEY[ctlCfg.tapAction || 'jump'] || ' ';
+      ctlHeld[p.id] = key; ctlPress(key); return true;
+    }
+    if (sch === 'aim') {
+      CTL.aim.x = p.x; CTL.aim.y = p.y; CTL.aim.active = true;
+      const f = ctlCfg.aim && ctlCfg.aim.fire;
+      if (f !== false) { ctlHeld[p.id] = ACT2KEY[f || 'attack'] || 'x'; ctlPress(ctlHeld[p.id]); }
+      return true;
+    }
+    return false;
+  }
+  function ctlMove(p) {
+    CTL.mouse.x = p.x; CTL.mouse.y = p.y;
+    if (!ctlCfg) return;
+    if (joy && p.id === joy.id) {
+      const R = ((ctlCfg.joystick && ctlCfg.joystick.radius) || 0.09) * Math.min(W, H);
+      const dz = (ctlCfg.joystick && ctlCfg.joystick.deadzone) || 0.3;
+      let dx = (p.x - joy.cx) / R, dy = (p.y - joy.cy) / R;
+      const len = Math.hypot(dx, dy);
+      if (len > 1) { dx /= len; dy /= len; }
+      CTL.axis.x = dx; CTL.axis.y = dy;
+      joy.dx = dx; joy.dy = dy;
+      // 8-way → клавиши
+      (dx < -dz ? ctlPress : ctlRelease)('ArrowLeft');
+      (dx > dz ? ctlPress : ctlRelease)('ArrowRight');
+      (dy < -dz ? ctlPress : ctlRelease)('ArrowUp');
+      (dy > dz ? ctlPress : ctlRelease)('ArrowDown');
+    }
+    if (CTL.scheme === 'aim' && CTL.aim.active) { CTL.aim.x = p.x; CTL.aim.y = p.y; }
+    if (CTL.scheme === 'tapmove' && tapTarget && p.id === tapTarget.id) { tapTarget.x = p.x; tapTarget.y = p.y; }
+  }
+  function ctlUp(p) {
+    if (!ctlCfg) return false;
+    let ate = false;
+    if (ctlHeld[p.id]) { ctlRelease(ctlHeld[p.id]); delete ctlHeld[p.id]; ate = true; }
+    if (joy && p.id === joy.id) {
+      joy = null; CTL.axis.x = 0; CTL.axis.y = 0;
+      ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].forEach(ctlRelease);
+      ate = true;
+    }
+    if (CTL.scheme === 'aim') { CTL.aim.active = false; ate = true; }
+    if (CTL.scheme === 'tapmove' && tapTarget && p.id === tapTarget.id) { tapTarget = null; ate = true; }
+    return ate;
+  }
+  // tap-to-move: каждый кадр сравниваем цель с экранной позицией персонажа
+  // (сцена сообщает её через engine.reportPlayerScreen)
+  function ctlUpdate() {
+    if (!ctlCfg || CTL.scheme !== 'tapmove') return;
+    if (!tapTarget || !CTL.playerScreen) {
+      if (!tapTarget) { ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].forEach(ctlRelease); }
+      return;
+    }
+    const px = CTL.playerScreen.x, py = CTL.playerScreen.y;
+    const dx = tapTarget.x - px, dy = tapTarget.y - py;
+    const dead = Math.min(W, H) * 0.04;
+    (dx < -dead ? ctlPress : ctlRelease)('ArrowLeft');
+    (dx > dead ? ctlPress : ctlRelease)('ArrowRight');
+    (dy < -dead * 2.2 ? ctlPress : ctlRelease)('ArrowUp');     // вверх — с большим порогом (прыжок/лестницы)
+    (dy > dead * 2.2 ? ctlPress : ctlRelease)('ArrowDown');
+  }
+  function drawControls() {
+    if (!ctlCfg) return;
+    // кнопки
+    for (let i = 0; i < ctlBtns.length; i++) {
+      const b = ctlBtns[i];
+      ctx.fillStyle = keys.has(b.key) ? 'rgba(255,255,255,0.34)' : 'rgba(255,255,255,0.15)';
+      ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.font = 'bold ' + Math.round(b.r * 0.8) + 'px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(b.glyph, b.x, b.y + 1);
+    }
+    // джойстик
+    if (CTL.scheme === 'joystick') {
+      const R = ((ctlCfg.joystick && ctlCfg.joystick.radius) || 0.09) * Math.min(W, H);
+      if (joy) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(joy.cx, joy.cy, R, 0, 7); ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.beginPath(); ctx.arc(joy.cx + (joy.dx || 0) * R, joy.cy + (joy.dy || 0) * R, R * 0.42, 0, 7); ctx.fill();
+      } else {
+        // подсказка-призрак в зоне
+        const side = (ctlCfg.joystick && ctlCfg.joystick.side) || 'left';
+        const gx = side === 'right' ? W * 0.78 : W * 0.22, gy = H * 0.82;
+        ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(gx, gy, R, 0, 7); ctx.stroke();
+        ctx.beginPath(); ctx.arc(gx, gy, R * 0.42, 0, 7); ctx.stroke();
+      }
+    }
+    // маркер tap-to-move
+    if (CTL.scheme === 'tapmove' && tapTarget) {
+      ctx.strokeStyle = 'rgba(255,255,255,' + (0.5 + Math.sin(Date.now() / 130) * 0.3) + ')';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(tapTarget.x, tapTarget.y, 12, 0, 7); ctx.stroke();
+      ctx.beginPath(); ctx.arc(tapTarget.x, tapTarget.y, 3, 0, 7); ctx.fill();
+    }
+    // прицел aim
+    if (CTL.scheme === 'aim' && CTL.aim.active) {
+      ctx.strokeStyle = 'rgba(255,120,120,0.85)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(CTL.aim.x, CTL.aim.y, 11, 0, 7); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(CTL.aim.x - 16, CTL.aim.y); ctx.lineTo(CTL.aim.x + 16, CTL.aim.y);
+      ctx.moveTo(CTL.aim.x, CTL.aim.y - 16); ctx.lineTo(CTL.aim.x, CTL.aim.y + 16); ctx.stroke();
+    }
+  }
+
   // ── объект, который получает сцена ──
   const api = {
     get ctx() { return ctx; },
@@ -99,6 +257,8 @@ const CONFIG = {"genre":"match3","meta":{"title":"Sharky Match-3 — Medieval"},
     get duration() { return duration; },
     get state() { return state; },
     get keys() { return keys; },          // живой Set зажатых клавиш
+    get ctl() { return CTL; },            // слой управления: axis/aim/mouse/scheme
+    reportPlayerScreen: function (x, y) { CTL.playerScreen = { x: x, y: y }; },
     img: function (name) { return IMG[name]; },
     beep: beep,
     burst: burst,
@@ -106,6 +266,7 @@ const CONFIG = {"genre":"match3","meta":{"title":"Sharky Match-3 — Medieval"},
     setScore: setScore,
     gameOver: gameOver,
     resetTimer: resetTimer,
+    addTime: addTime,
     rr: rr,
     accent: accent,
   };
@@ -125,6 +286,10 @@ const CONFIG = {"genre":"match3","meta":{"title":"Sharky Match-3 — Medieval"},
   };
   // Принудительный одиночный кадр (для тестов в скрытой вкладке, где rAF не тикает).
   Engine.renderOnce = function () { if (scene && assetsReady) render(); };
+  Engine._ctl = CTL;   // отладка слоя управления
+  Engine._keys = keys;
+  // Принудительный шаг цикла ядра (управление+сцена) — тоже для тестов без rAF.
+  Engine.stepOnce = function (dt) { if (scene && assetsReady) update(dt || 1 / 60); };
 
   // ════════════════════════════════════════════ BOOT
   function boot(config) {
@@ -139,6 +304,7 @@ const CONFIG = {"genre":"match3","meta":{"title":"Sharky Match-3 — Medieval"},
     if (!factory) { console.error('Engine: нет сцены для жанра', config.genre); return; }
     scene = factory(api, config);
     Engine._scene = scene;   // для отладки/тестов
+    initControls(config.controls);
 
     window.addEventListener('resize', resize);
     bindInput();
@@ -160,6 +326,7 @@ const CONFIG = {"genre":"match3","meta":{"title":"Sharky Match-3 — Medieval"},
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = false;            // чёткий пиксель-арт
     headerH = Math.max(48, Math.min(96, H * 0.13));
+    layoutCtlButtons();
     if (scene && scene.layout) scene.layout({ W: W, H: H, headerH: headerH });
   }
 
@@ -219,6 +386,7 @@ const CONFIG = {"genre":"match3","meta":{"title":"Sharky Match-3 — Medieval"},
   }
   function update(dt) {
     if (state === 'playing') {
+      ctlUpdate();                                   // tap-to-move → клавиши
       if (timed) { timeLeft -= dt; if (timeLeft <= 0) { timeLeft = 0; gameOver(); } }
       if (scene.update) scene.update(dt);
     }
@@ -233,6 +401,8 @@ const CONFIG = {"genre":"match3","meta":{"title":"Sharky Match-3 — Medieval"},
   }
   // Сброс таймера раунда (для пораундовых игр). Без аргумента — на полную длительность.
   function resetTimer(sec) { if (sec) duration = sec; timeLeft = duration; }
+  // Добавить/отнять время (штрафы и бонусы времени)
+  function addTime(sec) { timeLeft = Math.max(0.01, Math.min(duration, timeLeft + sec)); }
 
   // ════════════════════════════════════════════ СЧЁТ
   function addScore(n) { setScore(score + n); }
@@ -247,6 +417,7 @@ const CONFIG = {"genre":"match3","meta":{"title":"Sharky Match-3 — Medieval"},
     if (scene.render) scene.render(ctx);
     drawParts();
     if (scene.hud) scene.hud(ctx); else drawHUD();
+    drawControls();                                  // джойстик/кнопки/прицел поверх HUD
     if (state === 'over') drawOver();
   }
   function drawBg() {
@@ -361,12 +532,15 @@ const CONFIG = {"genre":"match3","meta":{"title":"Sharky Match-3 — Medieval"},
       const p = localPt(e); p.id = e.pointerId;
       pointers[e.pointerId] = { x: p.x, y: p.y };
       downX = p.x; downY = p.y; hasDown = true;   // совместимость со сценами без мультитача
+      if (ctlDown(p)) return;                     // съедено слоем управления
       if (scene.pointerDown) scene.pointerDown(p);
     });
     cv.addEventListener('pointerup', function (e) { endPointer(e, false); });
     cv.addEventListener('pointercancel', function (e) { endPointer(e, true); });
     cv.addEventListener('pointermove', function (e) {
-      if (scene.pointerMove) { const p = localPt(e); p.id = e.pointerId; scene.pointerMove(p); }
+      const p = localPt(e); p.id = e.pointerId;
+      ctlMove(p);
+      if (scene.pointerMove) scene.pointerMove(p);
     });
     window.addEventListener('keydown', function (e) {
       if (GAME_KEYS.indexOf(e.key) !== -1) e.preventDefault();
@@ -380,6 +554,7 @@ const CONFIG = {"genre":"match3","meta":{"title":"Sharky Match-3 — Medieval"},
     const start = pointers[e.pointerId]; delete pointers[e.pointerId];
     if (state === 'over') { hasDown = false; return; }
     const p = localPt(e);
+    if (ctlUp({ x: p.x, y: p.y, id: e.pointerId })) { hasDown = false; return; }
     const sx = start ? start.x : downX, sy = start ? start.y : downY;
     const dx = p.x - sx, dy = p.y - sy, dist = Math.sqrt(dx * dx + dy * dy);
     const dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');

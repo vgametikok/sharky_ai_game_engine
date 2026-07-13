@@ -77,7 +77,7 @@ Engine.register('platformer', function (engine, cfg) {
   const LEVELS = P.levels || [];
   const VIEW_TX = P.viewTilesX || 12;
   const LB = (cfg.theme && cfg.theme.labels) || {};
-  const TOUCH = P.touchControls !== false && MODE !== 'runner';
+  const TOUCH = P.touchControls !== false && MODE !== 'runner' && !cfg.controls;   // CONFIG.controls замещает встроенные кнопки
   const FONT = (cfg.theme && cfg.theme.font) || 'sans-serif';
 
   // ── состояние мира ──
@@ -901,8 +901,13 @@ Engine.register('platformer', function (engine, cfg) {
   // выстрел игрока: count снарядов веером на w.spread радиан
   function fireWeapon(src, w) {
     const n = w.count || 1;
-    const base = src.facing > 0 ? 0 : Math.PI;
-    if (n === 1) { fireProjectile(src, w, true); return; }
+    let base = src.facing > 0 ? 0 : Math.PI;
+    // aim-схема: точный угол в сторону касания/курсора
+    if (engine.ctl.scheme === 'aim' && engine.ctl.aim.active && engine.ctl.playerScreen) {
+      base = Math.atan2(engine.ctl.aim.y - engine.ctl.playerScreen.y,
+                        engine.ctl.aim.x - engine.ctl.playerScreen.x);
+    }
+    if (n === 1) { fireProjectile(src, w, true, base); return; }
     const total = w.spread || 0.5;
     for (let i = 0; i < n; i++) {
       const off = (i - (n - 1) / 2) * (total / Math.max(1, n - 1));
@@ -1445,6 +1450,13 @@ Engine.register('platformer', function (engine, cfg) {
         }
       }
       ents = ents.filter(e => !e.dead);
+
+      // экранная позиция игрока для слоя управления (tap-to-move, aim)
+      const psc = worldToScreen(player.x + player.w / 2, player.y + player.h / 2);
+      engine.reportPlayerScreen(psc.x, psc.y);
+      // aim-схема: разворот к точке прицела
+      if (engine.ctl.scheme === 'aim' && engine.ctl.aim.active)
+        player.facing = engine.ctl.aim.x >= psc.x ? 1 : -1;
 
       // ── камера ──
       const targetX = player.x + player.w / 2 - viewW / 2 + player.facing * TS * 1.5;
