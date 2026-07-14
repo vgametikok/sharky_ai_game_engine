@@ -21,7 +21,9 @@ async function tgCall(payload) {
   return r.json();
 }
 
-// Возвращает {link, waitDone}: link открыть в Telegram, waitDone — промис входа.
+// Возвращает {link, token, waitDone}: link открыть в Telegram (deep-link),
+// token — запасной путь «отправь боту код lg_<token>» (некоторые клиенты TG
+// теряют start-параметр у уже начатого чата), waitDone — промис входа.
 export async function startTelegramLogin(onStatus) {
   const { token, link, error } = await tgCall({ action: 'new' });
   if (!token) throw new Error(error || 'не удалось создать токен входа');
@@ -50,7 +52,7 @@ export async function startTelegramLogin(onStatus) {
     throw new Error('время ожидания вышло');
   })();
 
-  return { link, waitDone };
+  return { link, token, waitDone };
 }
 
 export async function signOut() { await supa.auth.signOut(); }

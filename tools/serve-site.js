@@ -21,7 +21,10 @@ http.createServer((req, res) => {
   if (!file.startsWith(root)) { res.writeHead(403); res.end('forbidden'); return; }
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404); res.end('not found'); return; }
-    res.writeHead(200, { 'Content-Type': TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream' });
+    res.writeHead(200, {
+      'Content-Type': TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream',
+      'Cache-Control': 'no-store',   // дев-сервер: браузер не должен кешировать ES-модули
+    });
     res.end(data);
   });
 }).listen(port, () => console.log('maker site on http://localhost:' + port + '/'));

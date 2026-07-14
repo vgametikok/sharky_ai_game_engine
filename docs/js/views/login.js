@@ -37,13 +37,24 @@ export default async function loginView() {
         status.style.display = '';
         status.textContent = 'создаю ссылку входа…';
         const waitText = h('div', { style: 'margin-top:8px' }, 'открой ссылку и нажми Start — вход произойдёт сам');
-        const { link, waitDone } = await startTelegramLogin((s) => {
+        const { link, token, waitDone } = await startTelegramLogin((s) => {
           if (s === 'pending') waitText.textContent = 'жду подтверждения в Telegram…';
         });
         status.innerHTML = '';
+        const code = 'lg_' + token;
         status.append(
           h('a.btn.primary', { href: link, target: '_blank', rel: 'noopener' }, 'Открыть Telegram и нажать Start'),
           waitText,
+          // запасной путь: часть клиентов TG теряет start-параметр у старого чата
+          h('div.hint', { style: 'margin-top:10px' }, 'кнопка Start не появилась / ничего не произошло?'),
+          h('div', { style: 'margin-top:4px' },
+            'отправь боту ', h('b', {}, '@sharkyplay_bot'), ' код: ',
+            h('code', { style: 'user-select:all' }, code), ' ',
+            h('button.btn', {
+              style: 'padding:2px 10px',
+              onclick: () => { navigator.clipboard?.writeText(code); toast('код скопирован'); },
+            }, '⧉'),
+          ),
         );
         await waitDone;
         location.hash = '#/cabinet';
