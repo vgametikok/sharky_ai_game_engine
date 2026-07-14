@@ -30,41 +30,46 @@ export default async function loginView() {
     }
   } catch { /* нет сессии — просто не показываем панель */ }
 
+  // ── Telegram: как на сайте Sharky — клик сразу открывает Telegram,
+  // кнопка ждёт подтверждения. Запасной путь (код для бота) показываем
+  // ТОЛЬКО если подтверждение не пришло быстро: часть клиентов TG
+  // (особенно Telegram Web) молча теряет start-параметр у старого чата.
+  const TG_LABEL = '📨 Войти через Telegram';
   const tgBtn = h('button.btn.big', {
     onclick: async () => {
       try {
         tgBtn.disabled = true;
-        status.style.display = '';
-        status.textContent = 'создаю ссылку входа…';
-        const waitText = h('div', { style: 'margin-top:8px' }, 'открой ссылку и нажми Start — вход произойдёт сам');
-        const { link, token, waitDone } = await startTelegramLogin((s) => {
-          if (s === 'pending') waitText.textContent = 'жду подтверждения в Telegram…';
-        });
-        status.innerHTML = '';
+        tgBtn.textContent = 'Подтвердите вход в Telegram…';
+        const { link, token, waitDone } = await startTelegramLogin();
+        window.open(link, '_blank', 'noopener');
         const code = 'lg_' + token;
-        status.append(
-          h('a.btn.primary', { href: link, target: '_blank', rel: 'noopener' }, 'Открыть Telegram и нажать Start'),
-          waitText,
-          // запасной путь: часть клиентов TG теряет start-параметр у старого чата
-          h('div.hint', { style: 'margin-top:10px' }, 'кнопка Start не появилась / ничего не произошло?'),
-          h('div', { style: 'margin-top:4px' },
-            'отправь боту ', h('b', {}, '@sharkyplay_bot'), ' код: ',
-            h('code', { style: 'user-select:all' }, code), ' ',
-            h('button.btn', {
-              style: 'padding:2px 10px',
-              onclick: () => { navigator.clipboard?.writeText(code); toast('код скопирован'); },
-            }, '⧉'),
-          ),
-        );
+        const slow = setTimeout(() => {
+          status.style.display = '';
+          status.innerHTML = '';
+          status.append(
+            h('div.hint', {}, 'не сработало? открой ',
+              h('a', { href: link, target: '_blank', rel: 'noopener' }, 'ссылку'),
+              ' ещё раз или отправь боту ', h('b', {}, '@sharkyplay_bot'), ' код:'),
+            h('div', { style: 'margin-top:4px' },
+              h('code', { style: 'user-select:all' }, code), ' ',
+              h('button.btn', {
+                style: 'padding:2px 10px',
+                onclick: () => { navigator.clipboard?.writeText(code); toast('код скопирован'); },
+              }, '⧉'),
+            ),
+          );
+        }, 8000);
         await waitDone;
+        clearTimeout(slow);
         location.hash = '#/cabinet';
       } catch (e) {
         toast(e.message || String(e), true);
         tgBtn.disabled = false;
+        tgBtn.textContent = TG_LABEL;
         status.style.display = 'none';
       }
     },
-  }, '📨 Войти через Telegram');
+  }, TG_LABEL);
 
   return h('div.loginbox', {},
     h('div.eyebrow', {}, 'вход'),
