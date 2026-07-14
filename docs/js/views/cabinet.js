@@ -23,15 +23,15 @@ export default async function cabinetView() {
           h('div', {},
             h('div.mono', {}, profile.display_name + ' '),
             h('div.hint', {}, '@' + profile.username +
-              (profile.telegram_id ? ' · Telegram привязан' : '') +
+              (profile.tgLogin ? ' · вход через Telegram' : '') +
               (profile.role === 'admin' ? ' · админ' : '')),
           ),
           h('span.badge.green', { style: 'margin-left:auto' }, 'активен'),
         )
       : h('div', {},
-          h('span.badge.coral', {}, 'не найден'),
+          h('span.badge.coral', {}, 'профиль не получен'),
           h('p.hint', { style: 'margin-top:8px' },
-            'Для этого входа нет профиля Sharky. Зайди один раз в Sharky этим же способом (Google/Telegram) — и профиль появится здесь. Публикация игр без него не работает.'),
+            'Не удалось получить профиль Sharky (обычно это сбой сети). Обнови страницу — профиль создаётся автоматически для любого входа.'),
         ),
   );
 

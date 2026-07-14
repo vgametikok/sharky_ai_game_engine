@@ -55,13 +55,18 @@ export async function startTelegramLogin(onStatus) {
 
 export async function signOut() { await supa.auth.signOut(); }
 
-// Аккаунт Sharky этого же логина (по auth_uid). null — аккаунта нет.
+// Профиль Sharky текущей сессии — через DEFINER-RPC web_ensure_user (тот же,
+// что на сайте Sharky): находит ИЛИ создаёт строку users по auth.uid().
+// ВАЖНО: прямой select из users здесь невозможен — у роли authenticated
+// НЕТ SELECT-гранта на auth_uid/telegram_id (модель безопасности Sharky),
+// такой запрос падает 401 и профиль выглядит «не найденным».
 export async function sharkyProfile() {
   const { data: s } = await supa.auth.getSession();
-  const authUid = s?.session?.user?.id;
-  if (!authUid) return null;
-  const { data } = await supa.from('users')
-    .select('id, username, display_name, avatar_emoji, telegram_id, role')
-    .eq('auth_uid', authUid).maybeSingle();
-  return data || null;
+  const user = s?.session?.user;
+  if (!user) return null;
+  const { data, error } = await supa.rpc('web_ensure_user');
+  if (error) throw new Error('профиль Sharky недоступен: ' + error.message);
+  if (!data) return null;
+  // вход выполнен через Telegram (email-маркер tg_<id>@sharky.telegram)
+  return { ...data, tgLogin: (user.email || '').endsWith('@sharky.telegram') };
 }

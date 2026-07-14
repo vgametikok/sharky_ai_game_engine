@@ -45,7 +45,9 @@ async function route() {
   // OAuth-редирект: supabase-js сам разберёт токены из URL и подожжёт SIGNED_IN
   if (hash.includes('access_token=') || hash.includes('error_description=')) return;
   if (!hash || hash === '#' || hash === '#/') {
-    location.hash = session ? '#/cabinet' : '#/login';
+    // Входная дверь всегда #/login: даже при живой сессии Sharky вход в Maker —
+    // явный клик «Продолжить как …» на странице входа (запрос юзера).
+    location.hash = '#/login';
     return;
   }
   const seq = ++routeSeq;
