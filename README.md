@@ -5,7 +5,8 @@
 ## Сайт: Sharky Game Maker (docs/)
 
 Сервис генерации игр на этом движке — SPA в `docs/`, хостится GitHub Pages
-(`main` / каталог `/docs`): `https://vgametikok.github.io/sharky_ai_game_engine/`.
+(публикуется корень `main`, корневой `index.html` редиректит в `docs/`):
+`https://vgametikok.github.io/sharky_ai_game_engine/`.
 Мастер выбора (тип/жанр/механики/управление/описание) → LLM (Claude/Grok/Gemini)
 пишет CONFIG → PixelLab рисует ассеты → сборка одного `.html` прямо в браузере →
 скачивание или публикация в Sharky (на модерацию). Архитектура — `docs/PLAN.md`.

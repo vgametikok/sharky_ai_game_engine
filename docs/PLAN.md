@@ -1,10 +1,11 @@
 # Sharky Game Maker — сайт-сервис генерации игр
 
-Сайт живёт в этом же репозитории (папка `docs/`, GitHub Pages: ветка `main`, каталог `/docs`)
-и превращает движок в сервис: мастер выбора → LLM генерирует CONFIG → PixelLab генерирует
-ассеты → сборка одного `.html` прямо в браузере → скачивание или публикация в Sharky.
+Сайт живёт в этом же репозитории (папка `docs/`; GitHub Pages публикует ветку `main`
+с корня, корневой `index.html` мгновенно редиректит в `docs/`) и превращает движок в сервис:
+мастер выбора → LLM генерирует CONFIG → PixelLab генерирует ассеты → сборка одного `.html`
+прямо в браузере → скачивание или публикация в Sharky.
 
-URL: `https://vgametikok.github.io/sharky_ai_game_engine/`
+URL: `https://vgametikok.github.io/sharky_ai_game_engine/` (→ `…/docs/`)
 
 ## Архитектура
 
@@ -91,6 +92,7 @@ docs/
 
 1. `node tools/sync-site-engine.js` (после правок движка).
 2. Коммит и push в `main`.
-3. Один раз: Settings → Pages → Deploy from branch → `main` / `docs`.
+3. Pages настроены: Deploy from branch → `main` / root; корневые `index.html` (редирект
+   в `docs/`) и `.nojekyll` лежат в репозитории.
 
 Секретов на фронте нет: anon key публичный, ключи LLM — только в БД + edge-функциях.
