@@ -1,6 +1,10 @@
-// Вход как в Sharky: Google OAuth (Supabase) и Telegram deep-link (tg-login/tg-auth).
+// Вход как в Sharky: Google OAuth, Telegram Login Widget (основной путь),
+// Telegram deep-link (страховка для мобильного приложения).
 import { supa } from './supa.js';
 import { FN, SUPABASE_ANON } from './config.js';
+
+// Числовой id бота @sharkyplay_bot (часть токена до двоеточия) — нужен виджету.
+const TG_BOT_ID = 8642379598;
 
 export async function signInGoogle() {
   // redirect на текущую страницу сайта (Pages или localhost)
@@ -10,6 +14,49 @@ export async function signInGoogle() {
     options: { redirectTo },
   });
   if (error) throw error;
+}
+
+// ── Telegram Login Widget: официальный OAuth, как на большинстве сайтов ──
+// Не запускает бота (поэтому «неважно, сколько раз стартовал бота») и надёжно
+// работает в вебе, где deep-link Telegram сломан. Телефон Telegram спрашивает
+// ОДИН раз на браузер (не на сайт) и сайту его НЕ отдаёт.
+// ВАЖНО: домен страницы должен совпадать с заданным боту через @BotFather
+// /setdomain (у нас vgametikok.github.io) — на localhost попап выдаст
+// «Bot domain invalid», это ожидаемо, проверять только на проде.
+let widgetScript = null;
+function loadWidget() {
+  if (window.Telegram?.Login?.auth) return Promise.resolve();
+  if (widgetScript) return widgetScript;
+  widgetScript = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://telegram.org/js/telegram-widget.js?22';
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => { widgetScript = null; reject(new Error('не удалось загрузить Telegram-виджет')); };
+    document.head.appendChild(s);
+  });
+  return widgetScript;
+}
+
+export async function signInTelegramWidget() {
+  await loadWidget();
+  if (!window.Telegram?.Login?.auth) throw new Error('Telegram-виджет недоступен');
+  const user = await new Promise((resolve, reject) => {
+    window.Telegram.Login.auth({ bot_id: TG_BOT_ID, request_access: 'write' }, (data) => {
+      if (!data) reject(new Error('вход через Telegram отменён'));
+      else resolve(data);            // {id,first_name,last_name,username,photo_url,auth_date,hash}
+    });
+  });
+  const r = await fetch(FN('tg-auth'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON },
+    body: JSON.stringify({ mode: 'widget', widget: user }),
+  });
+  const d = await r.json();
+  if (!r.ok || !d.token_hash) throw new Error(d.error || 'обмен токена не удался');
+  const v = await supa.auth.verifyOtp({ type: 'email', token_hash: d.token_hash });
+  if (v.error) throw v.error;
+  return true;
 }
 
 async function tgCall(payload) {
