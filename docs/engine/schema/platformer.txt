@@ -1,0 +1,58 @@
+============================================================
+   СЦЕНА: platformer (platformer.js)
+   ------------------------------------------------------------
+   Универсальный 2D-платформер для Sharky: марио-стиль, метроидвания,
+   соулслайк, спеланки, бесконечный раннер — всё задаётся ДАННЫМИ в
+   CONFIG.platformer, код сцены один на все игры.
+
+   ── ВОЗМОЖНОСТИ ──
+   • Тайлмапы ASCII-строками + легенда (solid / one-way / лестницы /
+     шипы / двери с ключом / декор / вода*)                    [levels]
+   • Три режима уровней:
+       mode:'levels'  — список нарисованных уровней, выход → следующий
+       mode:'runner'  — бесконечный раннер из чанков (автобег, дистанция)
+       mode:'caves'   — генерация уровня из комнат-шаблонов с
+                        гарантированным путём (спеланки-лайт)
+   • Игрок: бег/прыжок (coyote time, jump buffer, переменная высота),
+     двойной прыжок / прыжок от стены / дэш-перекат — открываются
+     способностями (метроидвания), стамина (соулслайк), жизни, i-frames
+   • Оружие: ударное (меч, хитбокс по направлению) и стрельба
+     (снаряды), переключение, данные в WEAPONS
+   • Враги: ai = patrol | chase | fly | shooter | jumper | turret,
+     stomp по-мариовски, дропы, очки
+   • Боссы: фазы по HP, атаки-паттерны (charge/aimed/spread/slam/summon),
+     полоса HP, гейт выхода до смерти босса
+   • NPC с репликами (пузырь диалога)
+   • Пикапы: монеты, сердца, ключи, способности, оружие; чекпоинты
+   • Движущиеся платформы (переносят игрока)
+   • Камера со сглаживанием, тряска, параллакс-слои фона
+   • Тач-кнопки (мультитач: ← → прыжок/атака/дэш/смена оружия) + клавиатура
+   • Анимации спрайтами: {imgs:[кадры]} или {img,fw,fh,frames:[i]} —
+     либо цветные плейсхолдеры, если спрайтов нет (def.color)
+
+   ── СХЕМА CONFIG.platformer (все поля с дефолтами) ──
+   {
+     tileSize:16, viewTilesX:12, mode:'levels',
+     physics:{gravity,moveSpeed,accel,friction,airControl,jumpVel,maxFall,
+              coyote,buffer,wallSlide,wallJumpX,dashSpeed,dashTime,climbSpeed},
+     player:{w,h(в тайлах),hp,lives,weapons:['sword'],abilities:{doubleJump,
+             wallJump,dash},dashIFrames,stamina:{max,regen,attackCost,dashCost},
+             checkpointHeal,color,anims},
+     weapons:{sword:{type:'melee',dmg,range,cooldown,knockback},
+              bow:{type:'ranged',dmg,speed,cooldown,life,color}},
+     enemies:{walker:{w,h,hp,dmg,speed,ai,stompable,fly,range,shotCooldown,
+              projSpeed,score,color,drop,anims,
+              boss:{name,gate,onDeath,phases:[{hpPct,attacks,cooldown}],summon}}},
+     npcs:{sage:{lines:['…'],color}},
+     legend:{ '#':{tile,solid,color|img}, '-':{tile,oneWay}, '^':{tile,hazard:1},
+              'L':{tile,ladder}, 'D':{tile,solid,door}, 'P':{player},
+              'E':{exit}, 'S':{checkpoint}, 'C':{pickup:'coin',value},
+              'H':{pickup:'heart'}, 'K':{pickup:'key'},
+              'A':{pickup:'ability',ability:'doubleJump'},
+              'W':{pickup:'weapon',weapon:'bow'}, 'g':{enemy:'walker'},
+              'N':{npc:'sage'}, 'M':{platform,dx,dy,speed,wTiles} },
+     levels:[{map:[строки]}], runner:{speed,ramp,maxSpeed,chunks:[{map}]},
+     generator:{gridW,gridH,roomW,roomH,rooms:{LR:[],LRD:[],LRU:[],LRUD:[],X:[]}},
+     bgLayers:[{img,factor,y}], respawnEnemies:false, touchControls:true
+   }
+   ============================================================

@@ -1,0 +1,26 @@
+============================================================
+   СЦЕНА: shmup (shmup.js) — вертикальный шмап
+   ------------------------------------------------------------
+   Скролл вверх, автострельба, волны врагов по расписанию с лупом
+   и нарастающей сложностью. Всё — данными CONFIG.shmup.
+
+   Механики:
+   • АПГРЕЙДЫ ОРУЖИЯ: пикап 'P' повышает уровень (weapon.levels),
+     смерть сбрасывает на 1 уровень.
+   • БОМБА ('B', ограниченный запас): чистит все вражеские пули
+     (в очки) и бьёт всех врагов на экране.
+   • ПОЛЯРИЗАЦИЯ (Ikaruga, polarity:true): у игрока и пуль два цвета;
+     пуля СВОЕГО цвета поглощается ядром (+очки), ЧУЖОГО — урон.
+     Переключение кнопкой ⇄ / клавишей C.
+   • ГРЕЙЗ (Touhou): хитбокс-ядро много меньше спрайта (hitboxR);
+     пуля, прошедшая рядом с ядром (grazeR), даёт очки за смелость.
+
+   CONFIG.shmup = {
+     scroll:{speed,stars}, player:{w,h,speed,hp,bombs,hitboxR,color},
+     weapon:{cooldown,shotSpeed,levels:[{count,spread,dmg}...]},
+     polarity:true, colors:['#7ce0ff','#ff6b9e'], graze:{radius,score},
+     enemies:{id:{w,h,hp,speed,color,move:'straight|sine|dive|hover',
+                  gun:{cooldown,speed,aim:'down|player|spread3',pol}, score, drop}},
+     waves:[{t,enemy,n,interval,x}], loop:{hpMul,rateMul}
+   }
+   ============================================================

@@ -1,0 +1,542 @@
+<title>Sharky Game Engine — Карта возможностей</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    color-scheme: light dark;
+    /* ── светлая тема (по умолчанию): «спека на прохладной бумаге» ── */
+    --bg:#e9eef4; --bg2:#dfe6ee; --panel:#ffffff; --panel2:#f3f7fb;
+    --ink:#0e1d31; --ink2:#2f435c; --muted:#5d6f86; --line:#cfdae8;
+    --teal:#0c9b91; --green:#1f9a52; --coral:#d63d53; --violet:#6f4fd0; --amber:#b07708;
+    --hud:#0c9b91;
+    --shadow:0 1px 2px rgba(16,30,48,.05), 0 10px 30px rgba(16,30,48,.09);
+    --scan:0;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#070e1a; --bg2:#0a1322; --panel:#0f1c31; --panel2:#0c1729;
+      --ink:#d8e4f2; --ink2:#a7bad0; --muted:#7285a0; --line:rgba(120,165,210,.15);
+      --teal:#37d3c6; --green:#71e08c; --coral:#ff6472; --violet:#b493ff; --amber:#ffca55;
+      --hud:#37d3c6;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 14px 40px rgba(0,0,0,.45);
+      --scan:.05;
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#e9eef4; --bg2:#dfe6ee; --panel:#ffffff; --panel2:#f3f7fb;
+    --ink:#0e1d31; --ink2:#2f435c; --muted:#5d6f86; --line:#cfdae8;
+    --teal:#0c9b91; --green:#1f9a52; --coral:#d63d53; --violet:#6f4fd0; --amber:#b07708;
+    --hud:#0c9b91; --shadow:0 1px 2px rgba(16,30,48,.05), 0 10px 30px rgba(16,30,48,.09); --scan:0;
+  }
+  :root[data-theme="dark"]{
+    --bg:#070e1a; --bg2:#0a1322; --panel:#0f1c31; --panel2:#0c1729;
+    --ink:#d8e4f2; --ink2:#a7bad0; --muted:#7285a0; --line:rgba(120,165,210,.15);
+    --teal:#37d3c6; --green:#71e08c; --coral:#ff6472; --violet:#b493ff; --amber:#ffca55;
+    --hud:#37d3c6; --shadow:0 1px 2px rgba(0,0,0,.4), 0 14px 40px rgba(0,0,0,.45); --scan:.05;
+  }
+
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:
+      radial-gradient(1200px 620px at 78% -8%, color-mix(in srgb, var(--teal) 12%, transparent), transparent 60%),
+      linear-gradient(var(--bg2), var(--bg));
+    background-attachment:fixed;
+    color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    line-height:1.55; -webkit-font-smoothing:antialiased;
+  }
+  /* CRT-развёртка только в тёмной теме, статичная */
+  body::after{
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:9999;
+    background:repeating-linear-gradient(to bottom, rgba(0,0,0,var(--scan)) 0 1px, transparent 1px 3px);
+    opacity:1; mix-blend-mode:multiply;
+  }
+  .mono{font-family:ui-monospace,"SF Mono","Cascadia Code",Menlo,Consolas,monospace}
+  .wrap{max-width:1120px; margin:0 auto; padding:0 20px}
+  a{color:var(--teal); text-decoration:none}
+  a:hover{text-decoration:underline}
+  :focus-visible{outline:2px solid var(--teal); outline-offset:3px; border-radius:4px}
+
+  .eyebrow{
+    font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px; letter-spacing:.22em;
+    text-transform:uppercase; color:var(--muted); display:flex; align-items:center; gap:10px;
+  }
+  .eyebrow::before{content:""; width:22px; height:2px; background:var(--hud); display:inline-block}
+  h2{
+    font-family:ui-monospace,Menlo,Consolas,monospace; font-weight:700; letter-spacing:.02em;
+    text-transform:uppercase; font-size:clamp(20px,3.4vw,30px); margin:.5rem 0 0; text-wrap:balance;
+  }
+  .lede{color:var(--ink2); max-width:62ch; margin:.7rem 0 0; font-size:16px}
+  section{padding:clamp(44px,6vw,78px) 0; border-top:1px solid var(--line)}
+
+  /* ── HERO ── */
+  header{position:relative; overflow:hidden; padding:clamp(56px,9vw,110px) 0 clamp(30px,5vw,54px)}
+  .brandline{font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px; letter-spacing:.3em; text-transform:uppercase; color:var(--muted)}
+  .title{
+    font-family:ui-monospace,Menlo,Consolas,monospace; font-weight:800;
+    font-size:clamp(40px,10vw,104px); line-height:.94; letter-spacing:-.01em; margin:.28em 0 0;
+    text-transform:uppercase; text-wrap:balance;
+  }
+  .title .t1{color:var(--ink)}
+  .title .t2{color:var(--teal); text-shadow:0 0 22px color-mix(in srgb, var(--teal) 40%, transparent)}
+  .cursor{display:inline-block; width:.5em; height:.94em; background:var(--teal); transform:translateY(.08em); margin-left:.06em; box-shadow:0 0 16px var(--teal)}
+  .press{margin-top:1.3rem; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink2)}
+  .press b{color:var(--amber)}
+  .subtitle{margin-top:1.5rem; max-width:64ch; font-size:clamp(16px,2.1vw,19px); color:var(--ink2)}
+
+  /* HUD-полоса статов */
+  .hud{
+    margin-top:2.4rem; display:grid; grid-template-columns:repeat(5,1fr);
+    background:var(--panel); border:1px solid var(--line); border-radius:14px; overflow:hidden; box-shadow:var(--shadow);
+  }
+  .hud .cell{padding:18px 16px; display:flex; flex-direction:column; gap:4px; position:relative}
+  .hud .cell + .cell{border-left:1px solid var(--line)}
+  .hud .num{font-family:ui-monospace,Menlo,Consolas,monospace; font-weight:800; font-size:clamp(24px,4vw,40px); line-height:1; font-variant-numeric:tabular-nums; letter-spacing:-.02em}
+  .hud .lab{font-family:ui-monospace,Menlo,Consolas,monospace; font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted)}
+  .hud .cell::before{content:""; position:absolute; top:14px; right:14px; width:9px; height:9px; border-radius:2px; background:var(--dot,var(--teal)); box-shadow:0 0 10px var(--dot,var(--teal))}
+  @media(max-width:720px){
+    .hud{grid-template-columns:repeat(2,1fr)}
+    .hud .cell:nth-child(2n)+.cell{border-left:0}
+    .hud .cell{border-top:1px solid var(--line)}
+    .hud .cell:nth-child(-n+2){border-top:0}
+  }
+
+  /* ── PIPELINE ── */
+  .flow{display:flex; flex-wrap:wrap; align-items:stretch; gap:12px; margin-top:26px}
+  .node{
+    background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px; min-width:0; flex:1 1 150px;
+    box-shadow:var(--shadow);
+  }
+  .node .k{font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--teal)}
+  .node .v{font-size:13.5px; color:var(--ink2); margin-top:3px}
+  .arrow{align-self:center; color:var(--muted); font-family:ui-monospace,monospace; font-weight:700; flex:0 0 auto}
+  .flow .plus{align-self:center; color:var(--muted); font-family:ui-monospace,monospace; font-weight:700}
+  @media(max-width:640px){ .flow{flex-direction:column} .arrow,.flow .plus{transform:rotate(90deg); align-self:center} }
+
+  /* ── GENRE GRID ── */
+  .grid{display:grid; gap:16px; margin-top:30px}
+  .genres{grid-template-columns:repeat(auto-fill,minmax(255px,1fr))}
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:18px; box-shadow:var(--shadow);
+    transition:transform .15s ease, border-color .15s ease, box-shadow .15s ease; position:relative;
+  }
+  .card:hover{transform:translateY(-3px); border-color:color-mix(in srgb, var(--c,var(--teal)) 55%, var(--line))}
+  .card .top{display:flex; align-items:center; gap:12px}
+  .glyph{
+    width:42px; height:42px; flex:0 0 auto; display:grid; place-items:center; font-size:22px; border-radius:11px;
+    background:color-mix(in srgb, var(--c,var(--teal)) 16%, var(--panel2)); border:1px solid color-mix(in srgb, var(--c,var(--teal)) 35%, transparent);
+  }
+  .card h3{margin:0; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:16px; letter-spacing:.02em; text-transform:lowercase}
+  .card .role{font-size:12.5px; color:var(--muted)}
+  .card p{margin:.7rem 0 .9rem; font-size:13.5px; color:var(--ink2)}
+  .chips{display:flex; flex-wrap:wrap; gap:6px}
+  .chip{
+    font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11px; letter-spacing:.02em; line-height:1;
+    padding:6px 8px; border-radius:7px; border:1px solid var(--line); color:var(--ink2); background:var(--panel2); white-space:nowrap;
+  }
+  .chip.on{color:var(--c); border-color:color-mix(in srgb,var(--c) 45%,var(--line)); background:color-mix(in srgb,var(--c) 10%,var(--panel2))}
+
+  /* ── PLATFORMER CLOUD ── */
+  .cloudwrap{margin-top:26px; background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:20px; box-shadow:var(--shadow)}
+  .legend{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px}
+  .legend button{
+    font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11.5px; letter-spacing:.03em; cursor:pointer;
+    padding:7px 11px; border-radius:20px; border:1px solid color-mix(in srgb,var(--lc) 40%,var(--line));
+    background:color-mix(in srgb,var(--lc) 9%,var(--panel2)); color:var(--lc); display:flex; align-items:center; gap:7px;
+    transition:transform .12s ease; text-transform:uppercase;
+  }
+  .legend button::before{content:""; width:9px; height:9px; border-radius:2px; background:var(--lc); box-shadow:0 0 8px var(--lc)}
+  .legend button:hover{transform:translateY(-1px)}
+  .legend button[aria-pressed="true"]{background:var(--lc); color:#fff}
+  :root[data-theme="light"] .legend button[aria-pressed="true"]{color:#fff}
+  .legend button[aria-pressed="true"]::before{background:#fff; box-shadow:none}
+  .cloud{display:flex; flex-wrap:wrap; gap:8px}
+  .cloud .chip{font-size:12px; padding:8px 11px; cursor:default; transition:opacity .18s ease, filter .18s ease}
+  .cloud .chip{color:color-mix(in srgb,var(--cc) 88%, var(--ink)); border-color:color-mix(in srgb,var(--cc) 32%,var(--line)); background:color-mix(in srgb,var(--cc) 8%,var(--panel2))}
+  .cloud.filtering .chip{opacity:.16; filter:saturate(.3)}
+  .cloud.filtering .chip.active{opacity:1; filter:none}
+  .cat-move{--cc:var(--green)} .cat-fight{--cc:var(--coral)} .cat-level{--cc:var(--teal)} .cat-sys{--cc:var(--violet)} .cat-style{--cc:var(--amber)}
+  .stylerow{display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; padding-top:16px; border-top:1px dashed var(--line)}
+  .stylerow .tag{font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px; padding:7px 12px; border-radius:8px; color:var(--amber); border:1px solid color-mix(in srgb,var(--amber) 40%,var(--line)); background:color-mix(in srgb,var(--amber) 10%,var(--panel2))}
+  .stylerow .lbl{font-family:ui-monospace,monospace; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); align-self:center; margin-right:4px}
+
+  /* ── TWO-COL PANELS (controls / core) ── */
+  .cols{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:30px}
+  @media(max-width:820px){.cols{grid-template-columns:1fr}}
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:20px; box-shadow:var(--shadow)}
+  .panel h3{margin:0 0 2px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:14px; letter-spacing:.05em; text-transform:uppercase}
+  .panel .hint{color:var(--muted); font-size:12.5px; margin:0 0 14px}
+  .rows{display:flex; flex-direction:column; gap:10px}
+  .row{display:flex; gap:12px; align-items:baseline}
+  .row .key{font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px; color:var(--teal); flex:0 0 128px; letter-spacing:.02em}
+  .row .desc{font-size:13.5px; color:var(--ink2)}
+  .taglist{display:flex; flex-wrap:wrap; gap:7px; margin-top:2px}
+
+  /* ── GAMES ── */
+  .games{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+  .gcard{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:15px 16px; box-shadow:var(--shadow)}
+  .gcard.hero{border-color:color-mix(in srgb,var(--amber) 50%,var(--line)); background:color-mix(in srgb,var(--amber) 7%,var(--panel))}
+  .gcard .gt{display:flex; align-items:center; gap:8px; font-family:ui-monospace,Menlo,Consolas,monospace; font-weight:700; font-size:14px}
+  .gcard .badge{font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; padding:3px 6px; border-radius:5px; background:var(--amber); color:#231a04; font-family:ui-monospace,monospace}
+  .gcard .gd{font-size:12.5px; color:var(--muted); margin-top:5px}
+  .gcard ul{margin:8px 0 0; padding:0; list-style:none; display:flex; flex-direction:column; gap:4px}
+  .gcard li{font-size:12.5px; color:var(--ink2); position:relative; padding-left:15px}
+  .gcard li::before{content:"▸"; position:absolute; left:0; color:var(--teal); font-size:10px; top:2px}
+
+  footer{border-top:1px solid var(--line); padding:34px 0 60px; margin-top:20px}
+  .foot{display:flex; flex-wrap:wrap; justify-content:space-between; gap:16px; align-items:center}
+  .foot .repo{font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px}
+  .foot .meta{font-family:ui-monospace,monospace; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted)}
+
+  @media (prefers-reduced-motion:reduce){ *{transition:none!important; animation:none!important} }
+</style>
+
+<header>
+  <div class="wrap">
+    <div class="brandline">Игровой движок · платформа Sharky</div>
+    <h1 class="title"><span class="t1">SHARKY</span> <span class="t2">ENGINE</span><span class="cursor" aria-hidden="true"></span></h1>
+    <div class="press">▸ Press start — <b>один движок</b>, вся лента Sharky</div>
+    <p class="subtitle">Механики живут в ядре, конкретная игра — это маленький <span class="mono">CONFIG</span>. Генерация игр дешёвая, а каждая собирается в один самодостаточный <span class="mono">.html</span> под sandbox-iframe ленты.</p>
+
+    <div class="hud" role="list" aria-label="Ключевые цифры движка">
+      <div class="cell" role="listitem" style="--dot:var(--teal)"><span class="num" data-count="7">7</span><span class="lab">жанров</span></div>
+      <div class="cell" role="listitem" style="--dot:var(--green)"><span class="num" data-count="60" data-suffix="+">60+</span><span class="lab">механик</span></div>
+      <div class="cell" role="listitem" style="--dot:var(--violet)"><span class="num" data-count="5">5</span><span class="lab">схем управления</span></div>
+      <div class="cell" role="listitem" style="--dot:var(--amber)"><span class="num" data-count="20">20</span><span class="lab">игр и демо</span></div>
+      <div class="cell" role="listitem" style="--dot:var(--coral)"><span class="num">1</span><span class="lab">.html на игру</span></div>
+    </div>
+  </div>
+</header>
+
+<section id="how">
+  <div class="wrap">
+    <div class="eyebrow">Как это устроено</div>
+    <h2>Ядро + сцена + конфиг → один файл</h2>
+    <p class="lede">Ядро даёт всё общее (цикл, ввод, звук, HUD, протокол ленты). Сцена — механику жанра. Конфиг — данные конкретной игры. Сборщик склеивает всё в один инлайн-файл: внешних зависимостей нет, ассеты вшиты в base64.</p>
+    <div class="flow">
+      <div class="node"><div class="k">CONFIG</div><div class="v">картинки · уровни · правила · тексты</div></div>
+      <div class="plus">+</div>
+      <div class="node"><div class="k">Ядро core.js</div><div class="v">loop · ввод · звук · частицы · HUD · таймер</div></div>
+      <div class="plus">+</div>
+      <div class="node"><div class="k">Сцена жанра</div><div class="v">match3 · platformer · shmup · …</div></div>
+      <div class="arrow">→</div>
+      <div class="node"><div class="k">build.js</div><div class="v">сборка</div></div>
+      <div class="arrow">→</div>
+      <div class="node"><div class="k">один .html</div><div class="v">самодостаточный</div></div>
+      <div class="arrow">→</div>
+      <div class="node" style="border-color:color-mix(in srgb,var(--teal) 45%,var(--line))"><div class="k">Лента Sharky</div><div class="v">iframe · postMessage</div></div>
+    </div>
+  </div>
+</section>
+
+<section id="genres">
+  <div class="wrap">
+    <div class="eyebrow">Карта жанров</div>
+    <h2>Семь жанров-сцен</h2>
+    <p class="lede">Каждый жанр — отдельный модуль-сцена. Новая игра жанра = новый конфиг, код сцены не трогается.</p>
+    <div class="grid genres">
+      <div class="card" style="--c:var(--teal)">
+        <div class="top"><div class="glyph">🟦</div><div><h3>match-3</h3><div class="role">«три в ряд» + цель/раунды</div></div></div>
+        <p>Классика на очки или сбор цели за раунды со сменой набора.</p>
+        <div class="chips"><span class="chip on">молния/бомба/радуга</span><span class="chip on">слияния бустеров</span><span class="chip on">лёд</span><span class="chip on">лимит ходов</span></div>
+      </div>
+      <div class="card" style="--c:var(--green)">
+        <div class="top"><div class="glyph">🏃</div><div><h3>platformer</h3><div class="role">платформер на все стили</div></div></div>
+        <p>Самая глубокая сцена: физика, бой, боссы, три режима уровней.</p>
+        <div class="chips"><span class="chip on">3 режима уровней</span><span class="chip on">боссы</span><span class="chip on">метроидвания</span><span class="chip on">раннер</span></div>
+      </div>
+      <div class="card" style="--c:var(--coral)">
+        <div class="top"><div class="glyph">🚀</div><div><h3>shmup</h3><div class="role">вертикальный шмап</div></div></div>
+        <p>Скролл, волны с растущей сложностью, апгрейды оружия.</p>
+        <div class="chips"><span class="chip on">волны + луп</span><span class="chip on">бомба</span><span class="chip on">поляризация Ikaruga</span><span class="chip on">грейз Touhou</span></div>
+      </div>
+      <div class="card" style="--c:var(--violet)">
+        <div class="top"><div class="glyph">💬</div><div><h3>novel</h3><div class="role">визуальная новелла</div></div></div>
+        <p>Ветвящиеся диалоги, отношения, несколько концовок.</p>
+        <div class="chips"><span class="chip on">ветки + выборы</span><span class="chip on">симпатии</span><span class="chip on">флаги</span><span class="chip on">NG+</span><span class="chip on">галерея + журнал</span></div>
+      </div>
+      <div class="card" style="--c:var(--amber)">
+        <div class="top"><div class="glyph">🔍</div><div><h3>hidden</h3><div class="role">поиск предметов</div></div></div>
+        <p>Найди объекты на сцене за таймер, комбинируй находки.</p>
+        <div class="chips"><span class="chip on">таймер</span><span class="chip on">подсказки</span><span class="chip on">крафт-комбо</span></div>
+      </div>
+      <div class="card" style="--c:var(--teal)">
+        <div class="top"><div class="glyph">🔎</div><div><h3>diff</h3><div class="role">найди отличия</div></div></div>
+        <p>Две почти одинаковые процедурные сцены, тап по отличию.</p>
+        <div class="chips"><span class="chip on">процедурные сцены</span><span class="chip on">штраф времени</span><span class="chip on">раунды</span></div>
+      </div>
+      <div class="card" style="--c:var(--green)">
+        <div class="top"><div class="glyph">🧩</div><div><h3>puzzle</h3><div class="role">сокобан</div></div></div>
+        <p>Толкай ящики на цели свайпами, отменяй ходы.</p>
+        <div class="chips"><span class="chip on">толкание ящиков</span><span class="chip on">undo</span><span class="chip on">лимит ходов</span></div>
+      </div>
+      <div class="card" style="--c:var(--muted); border-style:dashed">
+        <div class="top"><div class="glyph" style="--c:var(--muted)">➕</div><div><h3 style="text-transform:none">новый жанр</h3><div class="role">≈ один файл-сцена</div></div></div>
+        <p>Добавить жанр = написать одну сцену по контракту. Дальше он тоже генерируется конфигами.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="platformer">
+  <div class="wrap">
+    <div class="eyebrow">Глубина движка</div>
+    <h2>Платформер — облако возможностей</h2>
+    <p class="lede">Одна сцена покрывает Марио, метроидвании, соулслайки, спеланки и раннеры. Наведи на категорию — подсветятся её механики. Всё включается флагами в конфиге.</p>
+
+    <div class="cloudwrap">
+      <div class="legend" role="group" aria-label="Фильтр категорий">
+        <button data-cat="move"  style="--lc:var(--green)"  aria-pressed="false">Движение</button>
+        <button data-cat="fight" style="--lc:var(--coral)"  aria-pressed="false">Бой · враги · боссы</button>
+        <button data-cat="level" style="--lc:var(--teal)"   aria-pressed="false">Уровни и мир</button>
+        <button data-cat="sys"   style="--lc:var(--violet)" aria-pressed="false">Системы</button>
+      </div>
+
+      <div class="cloud" id="cloud">
+        <!-- движение -->
+        <span class="chip cat-move" data-cat="move">бег + инерция</span>
+        <span class="chip cat-move" data-cat="move">coyote time</span>
+        <span class="chip cat-move" data-cat="move">буфер прыжка</span>
+        <span class="chip cat-move" data-cat="move">переменная высота</span>
+        <span class="chip cat-move" data-cat="move">двойной прыжок</span>
+        <span class="chip cat-move" data-cat="move">прыжок от стены</span>
+        <span class="chip cat-move" data-cat="move">скольжение по стене</span>
+        <span class="chip cat-move" data-cat="move">дэш-перекат + i-frames</span>
+        <span class="chip cat-move" data-cat="move">граунд-паунд</span>
+        <span class="chip cat-move" data-cat="move">крюк-кошка</span>
+        <span class="chip cat-move" data-cat="move">гравифлип</span>
+        <span class="chip cat-move" data-cat="move">слоу-мо</span>
+        <span class="chip cat-move" data-cat="move">лестницы</span>
+        <span class="chip cat-move" data-cat="move">пружины</span>
+        <span class="chip cat-move" data-cat="move">конвейеры</span>
+        <span class="chip cat-move" data-cat="move">ускорители</span>
+        <!-- бой / враги / боссы -->
+        <span class="chip cat-fight" data-cat="fight">ближний бой</span>
+        <span class="chip cat-fight" data-cat="fight">стрельба</span>
+        <span class="chip cat-fight" data-cat="fight">смена оружия</span>
+        <span class="chip cat-fight" data-cat="fight">временное супер-оружие</span>
+        <span class="chip cat-fight" data-cat="fight">летающие бонусы</span>
+        <span class="chip cat-fight" data-cat="fight">авто / веер / пробитие</span>
+        <span class="chip cat-fight" data-cat="fight">копание тайлов</span>
+        <span class="chip cat-fight" data-cat="fight">6 типов ИИ</span>
+        <span class="chip cat-fight" data-cat="fight">stomp по-марио</span>
+        <span class="chip cat-fight" data-cat="fight">дропы</span>
+        <span class="chip cat-fight" data-cat="fight">боссы: фазы по HP</span>
+        <span class="chip cat-fight" data-cat="fight">паттерны атак</span>
+        <span class="chip cat-fight" data-cat="fight">полоса HP + гейт выхода</span>
+        <!-- уровни и мир -->
+        <span class="chip cat-level" data-cat="level">ASCII-карты + легенда</span>
+        <span class="chip cat-level" data-cat="level">режим «уровни»</span>
+        <span class="chip cat-level" data-cat="level">бесконечный раннер</span>
+        <span class="chip cat-level" data-cat="level">генерация пещер</span>
+        <span class="chip cat-level" data-cat="level">полосы (Subway)</span>
+        <span class="chip cat-level" data-cat="level">подкат</span>
+        <span class="chip cat-level" data-cat="level">шипы · двери-ключи</span>
+        <span class="chip cat-level" data-cat="level">фазовые / ломаемые / копаемые</span>
+        <span class="chip cat-level" data-cat="level">условные тайлы</span>
+        <span class="chip cat-level" data-cat="level">ловушки: стреломёты</span>
+        <span class="chip cat-level" data-cat="level">маятники-лезвия</span>
+        <span class="chip cat-level" data-cat="level">подбор / бросок предметов</span>
+        <span class="chip cat-level" data-cat="level">верёвки вниз</span>
+        <span class="chip cat-level" data-cat="level">движущиеся платформы</span>
+        <span class="chip cat-level" data-cat="level">параллакс-фоны</span>
+        <span class="chip cat-level" data-cat="level">мини-карта + пометки</span>
+        <span class="chip cat-level" data-cat="level">fast travel</span>
+        <span class="chip cat-level" data-cat="level">бэктрекинг по флагам</span>
+        <!-- системы -->
+        <span class="chip cat-sys" data-cat="sys">погода: ветер + дождь</span>
+        <span class="chip cat-sys" data-cat="sys">цикл дня/ночи</span>
+        <span class="chip cat-sys" data-cat="sys">стелс: обзор + слух</span>
+        <span class="chip cat-sys" data-cat="sys">крафт из ресурсов</span>
+        <span class="chip cat-sys" data-cat="sys">комбо-множитель</span>
+        <span class="chip cat-sys" data-cat="sys">roguelite-выбор</span>
+        <span class="chip cat-sys" data-cat="sys">костюмы-трансформации</span>
+        <span class="chip cat-sys" data-cat="sys">скрытые звёзды</span>
+        <span class="chip cat-sys" data-cat="sys">чекпоинты · жизни</span>
+        <span class="chip cat-sys" data-cat="sys">стамина</span>
+        <span class="chip cat-sys" data-cat="sys">магнит / буст / щит</span>
+        <span class="chip cat-sys" data-cat="sys">NPC-диалоги</span>
+      </div>
+
+      <div class="stylerow">
+        <span class="lbl">Стили из коробки</span>
+        <span class="tag">Марио</span><span class="tag">Метроидвания</span><span class="tag">Соулслайк</span><span class="tag">Спеланки</span><span class="tag">Ран-энд-ган</span><span class="tag">Раннер</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="controls">
+  <div class="wrap">
+    <div class="eyebrow">Ввод</div>
+    <h2>Управление под ПК и мобилку</h2>
+    <p class="lede">Все схемы транслируются в виртуальные клавиши, поэтому работают с любым жанром без правок сцены. Любую игру можно переключить одной строкой конфига.</p>
+    <div class="cols">
+      <div class="panel">
+        <h3>Схемы управления</h3>
+        <p class="hint">CONFIG.controls · выбираешь схему под игру</p>
+        <div class="rows">
+          <div class="row"><span class="key">ПК</span><span class="desc">клавиатура + мышь; в aim-схеме мышь стреляет в сторону курсора</span></div>
+          <div class="row"><span class="key">joystick</span><span class="desc">виртуальный стик: зажал и водишь по кругу, 8 направлений + плавная ось</span></div>
+          <div class="row"><span class="key">tap-move</span><span class="desc">куда нажал на экран — туда идёт персонаж</span></div>
+          <div class="row"><span class="key">tap-action</span><span class="desc">весь экран = одна кнопка (например, прыжок раннера)</span></div>
+          <div class="row"><span class="key">aim</span><span class="desc">выстрелы в сторону касания, точным углом</span></div>
+          <div class="row"><span class="key">кнопки</span><span class="desc">программируемые: любое действие/клавиша, своя позиция и размер</span></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Что каждая игра получает бесплатно</h3>
+        <p class="hint">общий слой ядра · пишется один раз</p>
+        <div class="taglist">
+          <span class="chip">canvas + DPR</span><span class="chip">игровой цикл</span><span class="chip">мультитач + клавиатура</span>
+          <span class="chip">звук (beep)</span><span class="chip">частицы</span><span class="chip">ассеты base64 / webp / jpg</span>
+          <span class="chip">фон-картинка</span><span class="chip">HUD или свой HUD</span><span class="chip">таймер</span>
+          <span class="chip">экран Game Over</span><span class="chip">частичный ресайз</span>
+          <span class="chip on" style="--c:var(--teal)">протокол Sharky: init/start/pause → ready/score/gameover</span>
+          <span class="chip">автостарт вне ленты</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="pipeline">
+  <div class="wrap">
+    <div class="eyebrow">Производство</div>
+    <h2>Пайплайн ассетов и сборки</h2>
+    <div class="cols">
+      <div class="panel">
+        <h3>Инструменты</h3>
+        <p class="hint">от идеи до .html</p>
+        <div class="rows">
+          <div class="row"><span class="key">build.js</span><span class="desc">склейка ядра + сцены + конфига в один самодостаточный .html</span></div>
+          <div class="row"><span class="key">serve.js</span><span class="desc">локальный предпросмотр + приём скриншотов канваса</span></div>
+          <div class="row"><span class="key">PixelLab</span><span class="desc">генерация пиксель-спрайтов → нормализация → упаковка в base64</span></div>
+          <div class="row"><span class="key">упаковщики</span><span class="desc">ужимка иконок и вшивка ассетов в конфиг</span></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Доставка</h3>
+        <p class="hint">где живут игры</p>
+        <div class="rows">
+          <div class="row"><span class="key">GitHub</span><span class="desc">репозиторий движка со всеми сценами, конфигами и сборками</span></div>
+          <div class="row"><span class="key">ready games</span><span class="desc">готовые играбельные .html, папка финальных билдов</span></div>
+          <div class="row"><span class="key">Sharky</span><span class="desc">лента: sandbox-iframe, protocol postMessage, аналитика по score/gameover</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="games">
+  <div class="wrap">
+    <div class="eyebrow">Витрина</div>
+    <h2>Игры на движке</h2>
+    <p class="lede">Одна готовая игра плюс демо на каждую механику и схему управления — все собраны этим движком.</p>
+    <div class="grid games">
+      <div class="gcard hero">
+        <div class="gt"><span>🦈 SHARKY COMMANDO</span><span class="badge">готовая</span></div>
+        <div class="gd">ран-энд-ган платформер</div>
+        <ul><li>Спрайты из PixelLab</li><li>2 босса с фазами</li><li>Супер-оружие + бонусы</li><li>Параллакс-фон пляжа</li></ul>
+      </div>
+      <div class="gcard">
+        <div class="gt">🍳 Hungry Kitchen</div>
+        <div class="gd">match-3, цель/раунды</div>
+        <ul><li>Собери блюдо за 60 c</li><li>Доска + фон-кухня</li></ul>
+      </div>
+      <div class="gcard">
+        <div class="gt">⚔ match3-medieval / deluxe</div>
+        <div class="gd">match-3, классика + бустеры</div>
+        <ul><li>Эталон механики</li><li>Спецэлементы, лёд, ходы</li></ul>
+      </div>
+      <div class="gcard">
+        <div class="gt">🚀 Shark Shooter</div>
+        <div class="gd">shmup-демо</div>
+        <ul><li>Поляризация + грейз</li><li>Бомбы и апгрейды</li></ul>
+      </div>
+      <div class="gcard">
+        <div class="gt">💬 Reef Story</div>
+        <div class="gd">novel-демо</div>
+        <ul><li>3 концовки, NG+</li></ul>
+      </div>
+      <div class="gcard">
+        <div class="gt">🗺 Adventure / Mechanics</div>
+        <div class="gd">платформер-демо паков</div>
+        <ul><li>Spelunky · Nintendo</li><li>метроидвания-механики</li></ul>
+      </div>
+      <div class="gcard">
+        <div class="gt">🏃 Runner / Lanes / Caves</div>
+        <div class="gd">режимы платформера</div>
+        <ul><li>Раннер · полосы · генерация</li></ul>
+      </div>
+      <div class="gcard">
+        <div class="gt">🎮 4× CTL-демо</div>
+        <div class="gd">схемы управления</div>
+        <ul><li>joystick · tap-move</li><li>aim · tap-action</li></ul>
+      </div>
+      <div class="gcard">
+        <div class="gt">🔍🔎🧩 Hidden / Diff / Puzzle</div>
+        <div class="gd">жанры-демо</div>
+        <ul><li>Поиск · отличия · сокобан</li></ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <div class="repo">▸ <a href="https://github.com/vgametikok/sharky_ai_game_engine">github.com/vgametikok/sharky_ai_game_engine</a></div>
+    <div class="meta">7 жанров · 20 игр · один движок</div>
+  </div>
+</footer>
+
+<script>
+  (function(){
+    var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // ── count-up статов (аркадный «score») ──
+    function runCount(el){
+      var target = +el.getAttribute('data-count');
+      var suffix = el.getAttribute('data-suffix') || '';
+      if(reduce){ el.textContent = target + suffix; return; }
+      var t0 = null, dur = 900;
+      function tick(ts){
+        if(!t0) t0 = ts;
+        var p = Math.min(1, (ts - t0)/dur);
+        var e = 1 - Math.pow(1-p, 3);
+        el.textContent = Math.round(target * e) + (p>=1 ? suffix : '');
+        if(p < 1) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+    var nums = document.querySelectorAll('.num[data-count]');
+    if('IntersectionObserver' in window){
+      var io = new IntersectionObserver(function(es){
+        es.forEach(function(x){ if(x.isIntersecting){ runCount(x.target); io.unobserve(x.target); } });
+      }, {threshold:.6});
+      nums.forEach(function(n){ io.observe(n); });
+    } else nums.forEach(runCount);
+
+    // ── легенда-фильтр облака платформера ──
+    var cloud = document.getElementById('cloud');
+    var chips = cloud ? Array.prototype.slice.call(cloud.querySelectorAll('.chip')) : [];
+    var btns = document.querySelectorAll('.legend button');
+    var active = null;
+    function apply(cat){
+      active = (active === cat) ? null : cat;
+      btns.forEach(function(b){ b.setAttribute('aria-pressed', String(b.getAttribute('data-cat') === active)); });
+      if(!active){ cloud.classList.remove('filtering'); chips.forEach(function(c){ c.classList.remove('active'); }); return; }
+      cloud.classList.add('filtering');
+      chips.forEach(function(c){ c.classList.toggle('active', c.getAttribute('data-cat') === active); });
+    }
+    btns.forEach(function(b){
+      b.addEventListener('click', function(){ apply(b.getAttribute('data-cat')); });
+      b.addEventListener('mouseenter', function(){ if(!active){ preview(b.getAttribute('data-cat')); } });
+      b.addEventListener('mouseleave', function(){ if(!active){ cloud.classList.remove('filtering'); chips.forEach(function(c){ c.classList.remove('active'); }); } });
+    });
+    function preview(cat){
+      cloud.classList.add('filtering');
+      chips.forEach(function(c){ c.classList.toggle('active', c.getAttribute('data-cat') === cat); });
+    }
+  })();
+</script>
