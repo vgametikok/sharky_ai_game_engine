@@ -1,63 +1,65 @@
-/* «Забытая гробница» — горизонтальная метроидвания на сцене platformer.
-   Расхититель гробниц спускается в древний склеп. Способности открывают путь:
-   • двойной прыжок (A) — единственный способ подняться на площадку в 5 тайлов,
-     чтобы попасть в верхний тоннель;
-   • рывок (X) — в низком коридоре не подпрыгнуть (потолок), провал пересекается
-     только рывком с i-frames;
-   затем арена Стража склепа и запертый выход — открывается после его гибели.
-   Мини-карта (▦). Карта строится программно из заливок — колонки не сдвинутся. */
+/* «Забытая гробница» — ГОРИЗОНТАЛЬНЫЙ соулслайк-платформер (сцена platformer).
+   Странник-рыцарь пробивается через длинный склеп СЛЕВА НАПРАВО: костры-чекпоинты
+   (отдых лечит и воскрешает врагов — классический соулслайк-луп), стамина на удары
+   и перекат (dash с i-frames — уворот), медленные тяжёлые враги (скелеты, гули) и
+   финальный босс — Ашеновый Страж. Камера едет вбок; вертикаль заполняет фон пещеры.
+   Спрайты рыцаря/врагов/босса — PixelLab (crypt-metroid.px.js), иначе плейсхолдеры. */
 'use strict';
-
 const CRYPT_BG = require('./crypt-metroid.bg.js');
-const GW = 56, GH = 24;
+let px = {}; try { px = require('./crypt-metroid.px.js'); } catch (e) { /* до упаковки */ }
+const A = Object.keys(px).length > 0;
+const anims = (m) => (A ? m : null);
+const img = (n) => (px[n] ? n : undefined);
+
+const GW = 132, GH = 24;
 function buildMap() {
   const g = [];
   for (let y = 0; y < GH; y++) g.push(new Array(GW).fill(' '));
   const set = (x, y, ch) => { if (y >= 0 && y < GH && x >= 0 && x < GW) g[y][x] = ch; };
   const rect = (x0, y0, x1, y1, ch) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) set(x, y, ch); };
+  const GND = 20;                                    // верх основного пола
 
-  // рамка
-  rect(0, 0, GW - 1, 0, '#');            // потолок
-  rect(0, 0, 0, GH - 1, '#');            // левая стена
-  rect(GW - 1, 0, GW - 1, GH - 1, '#');  // правая стена
+  rect(0, 0, GW - 1, 0, '#');                         // свод
+  rect(0, 0, 0, GH - 1, '#'); rect(GW - 1, 0, GW - 1, GH - 1, '#');
+  rect(0, GND, GW - 1, GH - 1, '#');                  // сплошной пол по всей длине
 
-  // сталактиты со свода (декор, вне пути игрока) — заполняют пустоту пещеры
+  // сталактиты со свода (декор поверх фона)
   const stal = (x, len) => rect(x, 1, x, len, '#');
-  [[3,4],[6,2],[9,5],[13,3],[18,6],[22,3],[27,5],[31,2],[34,4],[39,6],[43,3],[47,5],[50,2],[52,4]]
-    .forEach(([x, l]) => stal(x, l));
+  for (let x = 4; x < GW - 4; x += 7) stal(x, 2 + ((x * 13) % 5));
 
-  // пол: стартовая площадка и арена, между ними — бездонная пропасть
-  rect(0, 22, 24, 23, '#');
-  rect(46, 22, 55, 23, '#');
+  // старт
+  set(2, GND - 1, 'P'); set(4, GND - 1, 'S');         // первый костёр
+  set(6, GND - 2, 'C'); set(8, GND - 2, 'C');
 
-  // ── ГЕЙТ 1: двойной прыжок ── площадка в 5 тайлов над полом (одиночный не достаёт)
-  rect(21, 17, 24, 17, '=');
+  // ── СЕКЦИЯ 1: скелеты + провал ──
+  set(14, GND - 1, 'k'); set(20, GND - 1, 'k');
+  rect(24, GND, 27, GH - 1, ' ');                     // провал (перепрыгнуть/перекатиться)
+  set(30, GND - 1, 'C'); set(31, GND - 1, 'C');
+  set(34, GND - 1, 'k');
+  set(38, GND - 1, 'S');                              // костёр 2
 
-  // верхний тоннель (пол row14) + дальняя площадка за провалом
-  rect(23, 14, 39, 14, '=');
-  rect(42, 14, 47, 14, '=');
-  // ── ГЕЙТ 2: рывок ── провал cols40-41 + низкий потолок над ним (нельзя подпрыгнуть)
-  rect(38, 12, 46, 12, '#');
+  // ── СЕКЦИЯ 2: подъём на уступ + гули ──
+  rect(44, GND - 4, 50, GND - 4, '=');               // уступ
+  set(46, GND - 5, 'C'); set(48, GND - 5, 'H');
+  set(45, GND - 5, 'u');
+  set(54, GND - 1, 'u'); set(60, GND - 1, 'u');
+  rect(64, GND - 6, 64, GND - 1, '#');               // низкая колонна-стена (перепрыгнуть уступом)
+  rect(58, GND - 3, 62, GND - 3, '-');               // one-way площадка чтобы перебраться
+  set(70, GND - 1, 'S');                             // костёр 3
 
-  // стартовая зона (row21 — над полом)
-  set(2, 21, 'P');
-  set(4, 21, 'N');
-  set(9, 21, 'A');            // двойной прыжок — берём сразу
-  set(12, 21, 'C'); set(13, 21, 'C');
-  set(16, 21, 'g');           // краулер
+  // ── СЕКЦИЯ 3: шипы + смешанные враги ──
+  set(76, GND - 1, '^'); set(77, GND - 1, '^'); set(78, GND - 1, '^');  // шипы (перекат)
+  set(82, GND - 1, 'k'); set(86, GND - 1, 'u');
+  rect(90, GND, 93, GH - 1, ' ');                    // второй провал
+  set(96, GND - 1, 'k'); set(99, GND - 1, 'u');
+  set(101, GND - 2, 'C'); set(103, GND - 2, 'C');
+  set(106, GND - 1, 'S');                            // костёр 4 (перед боссом)
+  set(107, GND - 2, 'H');
 
-  // верхний тоннель (row13 — над полом тоннеля)
-  set(24, 13, 'S');           // чекпоинт у входа в тоннель
-  set(28, 13, 'C'); set(30, 13, 'C');
-  set(31, 13, 'f');           // летучая мышь
-  set(35, 13, 'X');           // рывок — берём перед провалом
-  set(37, 13, 'C');
-
-  // арена Стража (row21 — над полом арены)
-  set(48, 21, 'S');           // чекпоинт перед боссом
-  set(49, 21, 'H');           // сердце
-  set(51, 21, 'B');           // босс
-  set(53, 21, 'E');           // выход (needsBossDead)
+  // ── АРЕНА БОССА ──
+  rect(110, GND - 8, 110, GND - 1, '#');             // ворота арены (визуальная стена)
+  set(120, GND - 1, 'B');                            // Ашеновый Страж
+  set(129, GND - 1, 'E');                            // выход (на случай, если onDeath не win)
 
   return g.map(row => row.join(''));
 }
@@ -70,56 +72,65 @@ module.exports = {
     bgTop: '#2a2038', bgBottom: '#0a0710',
     bgImage: 'cryptBg',
     font: "'Segoe UI', system-ui, sans-serif",
-    labels: { over: 'ПАЛ', win: 'СВОБОДА!', again: 'Тап — заново', scoreUnit: 'золота', level: 'Глубина' },
+    labels: { over: 'ТЫ ПАЛ', win: 'СКЛЕП ПОКОРЁН', again: 'Тап — восстать', scoreUnit: 'душ', level: 'Склеп' },
   },
-  assets: { cryptBg: CRYPT_BG },
+  assets: Object.assign({ cryptBg: CRYPT_BG }, px),
   rules: { mode: 'untimed' },
   platformer: {
-    tileSize: 16, viewTilesX: 11, mode: 'levels',
-    physics: { gravity: 1500, moveSpeed: 122, jumpVel: 420, dashSpeed: 340, dashTime: 0.16 },
-    map: true,
+    tileSize: 16, viewTilesX: 13, mode: 'levels',
+    physics: { gravity: 1500, moveSpeed: 108, jumpVel: 430, dashSpeed: 360, dashTime: 0.18 },
+    respawnEnemies: true,                              // отдых у костра воскрешает врагов
+    saveCheckpoint: true,                              // возобновление с последнего костра
     player: {
-      w: 0.7, h: 0.92, hp: 4, lives: 3, color: '#f4d38a',
-      weapons: ['blade'],
-      abilities: { doubleJump: false, dash: false },
+      w: 0.7, h: 0.95, hp: 5, lives: 5, color: '#f4d38a',
+      weapons: ['sword'],
+      abilities: { dash: true },                       // перекат-уворот
       dashIFrames: true,
+      checkpointHeal: true,
+      stamina: { max: 100, regen: 42, attackCost: 26, dashCost: 30 },
+      anims: anims({ idle: { imgs: [img('hero')], fps: 1, w: 1.7, h: 2.2 } }),
     },
     weapons: {
-      blade: { type: 'melee', dmg: 2, range: 1.05, cooldown: 0.32, knockback: 175 },
+      sword: { name: 'КЛИНОК', type: 'melee', dmg: 2, range: 1.15, cooldown: 0.42, knockback: 190 },
     },
     enemies: {
-      crawler: { w: 0.8, h: 0.75, hp: 2, dmg: 1, speed: 34, ai: 'patrol', stompable: true, score: 25, color: '#8f6f4a', drop: 'C', dropChance: 0.5 },
-      bat:     { w: 0.75, h: 0.65, hp: 1, dmg: 1, speed: 52, ai: 'chase', fly: true, range: 6, score: 30, color: '#7a5b8f' },
-      warden: {
-        w: 1.8, h: 1.7, hp: 22, dmg: 1, speed: 44, ai: 'chase', range: 13,
-        chargeSpeed: 235, projSpeed: 175, jumpVel: 380, score: 600, color: '#b8863b',
+      skeleton: {
+        w: 0.85, h: 1.0, hp: 4, dmg: 2, speed: 26, ai: 'patrol', stompable: false, score: 40,
+        color: '#cfc7b0', drop: 'C', dropChance: 0.5,
+        anims: anims({ idle: { imgs: [img('skeleton')], fps: 1, w: 1.5, h: 1.9 } }),
+      },
+      ghoul: {
+        w: 0.85, h: 0.95, hp: 5, dmg: 2, speed: 40, ai: 'chase', range: 9, stompable: false, score: 60,
+        color: '#7a8f6a', drop: 'C', dropChance: 0.6,
+        anims: anims({ idle: { imgs: [img('ghoul')], fps: 1, w: 1.5, h: 1.85 } }),
+      },
+      guardian: {
+        w: 1.9, h: 2.4, hp: 40, dmg: 3, speed: 40, ai: 'chase', range: 15,
+        chargeSpeed: 230, projSpeed: 180, jumpVel: 380, score: 1000, color: '#b8863b',
+        anims: anims({ idle: { imgs: [img('guardian')], fps: 1, w: 3.2, h: 3.6 } }),
         boss: {
-          name: 'СТРАЖ СКЛЕПА', onDeath: 'openExit',
+          name: 'АШЕНОВЫЙ СТРАЖ', onDeath: 'win',
           phases: [
-            { hpPct: 1.0, attacks: ['charge', 'aimed'], cooldown: 1.8 },
-            { hpPct: 0.5, attacks: ['charge', 'spread', 'slam'], cooldown: 1.15, speedMul: 1.4 },
+            { hpPct: 1.0, attacks: ['charge', 'aimed'], cooldown: 1.7 },
+            { hpPct: 0.55, attacks: ['charge', 'slam', 'spread'], cooldown: 1.2, speedMul: 1.35 },
+            { hpPct: 0.25, attacks: ['slam', 'spread', 'charge'], cooldown: 0.9, speedMul: 1.6 },
           ],
         },
       },
     },
-    npcs: {
-      keeper: { w: 0.75, h: 0.9, color: '#7fb8c0', lines: ['Ты тоже ищешь выход?', 'Реликвии дают силу…', 'Сначала прыжок, потом рывок', 'Страж стережёт врата'] },
-    },
     legend: {
       '#': { tile: true, solid: true, color: '#463a4e' },
       '=': { tile: true, solid: true, color: '#6e5738' },
-      '^': { tile: true, hazard: 1, color: '#c05248' },
+      '-': { tile: true, oneWay: true, color: '#7a5230' },
+      '^': { tile: true, hazard: 2, color: '#c05248' },
       'P': { player: true },
       'E': { exit: true, needsBossDead: true, color: '#7ce0a0' },
       'S': { checkpoint: true },
-      'C': { pickup: 'coin', value: 15, color: '#e6c34b' },
+      'C': { pickup: 'coin', value: 20, color: '#e6c34b' },
       'H': { pickup: 'heart', color: '#e8546a' },
-      'A': { pickup: 'ability', ability: 'doubleJump', label: 'Двойной прыжок!', color: '#6fd0ff' },
-      'X': { pickup: 'ability', ability: 'dash', label: 'Рывок!', color: '#ff7ac0' },
-      'g': { enemy: 'crawler' },
-      'f': { enemy: 'bat' },
-      'B': { enemy: 'warden' },
-      'N': { npc: 'keeper' },
+      'k': { enemy: 'skeleton' },
+      'u': { enemy: 'ghoul' },
+      'B': { enemy: 'guardian' },
     },
     levels: [{ map: buildMap() }],
   },

@@ -56,6 +56,7 @@
   let running = false, raf = 0, last = 0;
   let score = 0, best = 0, timeLeft = 0, duration = 0, timed = false;
   let assetsReady = false, pendingStart = false, gotShell = false;
+  let savedState = null;            // прогресс, присланный лентой в init (или null)
 
   // ── ассеты ──
   const IMG = {}; let imgTotal = 0, imgLoaded = 0;
@@ -252,6 +253,9 @@
     addScore: addScore,
     setScore: setScore,
     gameOver: gameOver,
+    // ── сохранение прогресса (лента хранит в Supabase per user+game) ──
+    saveState: function (obj) { try { savedState = obj; send({ type: 'save', value: obj }); } catch (e) {} },
+    loadState: function () { return savedState; },
     resetTimer: resetTimer,
     addTime: addTime,
     rr: rr,
@@ -277,6 +281,8 @@
   Engine._keys = keys;
   // Принудительный шаг цикла ядра (управление+сцена) — тоже для тестов без rAF.
   Engine.stepOnce = function (dt) { if (scene && assetsReady) update(dt || 1 / 60); };
+  // Применить сохранение и пересобрать забег (эмуляция init.save для тестов).
+  Engine._testLoad = function (o) { savedState = o; if (scene && assetsReady) newRun(); };
 
   // ════════════════════════════════════════════ BOOT
   function boot(config) {
@@ -558,6 +564,8 @@
       if (d.type === 'init') {
         gotShell = true;
         if (d.accent) { theme.accent = d.accent; document.documentElement.style.setProperty('--ac', d.accent); }
+        // прогресс из ленты: применяем ДО старта (сцена читает engine.loadState() в reset)
+        if (d.save !== undefined && d.save !== null) { savedState = d.save; if (assetsReady && !running) newRun(); }
       } else if (d.type === 'start') { gotShell = true; start(); }
       else if (d.type === 'pause') { gotShell = true; pause(); }
     });

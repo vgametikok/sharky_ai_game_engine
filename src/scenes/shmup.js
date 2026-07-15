@@ -49,13 +49,88 @@ Engine.register('shmup', function (engine, cfg) {
   let stars = [];
   let shakeT = 0, flashT = 0;
 
+  // ── режим кампании: 50 уровней, боссы каждые N, story-интерлюдии, сейв ──
+  const MODE = S.mode || 'endless';
+  const LVL_COUNT = S.levelCount || 50;
+  const BOSS_EVERY = S.bossEvery || 5;
+  const BOSSES = S.bosses || [];         // [{enemy,name,story,win}] для боссовых уровней (по порядку)
+  const POOL = S.pool || Object.keys(ENEMIES);
+  const INTRO = S.intro || null;         // строки вступления (показ на 1-м уровне)
+  let level = 0;                          // текущий уровень (0-based)
+  let lvlWaves = [], lvlWaveIdx = 0, lvlWaveT = 0;
+  let interT = 0, interLines = null;      // интерлюдия (пауза с текстом)
+
+  function isBossLevel(L) { return ((L + 1) % BOSS_EVERY) === 0; }         // L 0-based → уровни 5,10,…
+  function bossIndex(L) { return Math.floor((L + 1) / BOSS_EVERY) - 1; }
+  function bossOf(L) { return BOSSES[Math.min(bossIndex(L), BOSSES.length - 1)] || {}; }
+
+  function buildLevel(L) {
+    lvlWaves = []; lvlWaveIdx = 0; lvlWaveT = 0;
+    const hpMul = 1 + L * 0.09;
+    if (isBossLevel(L)) {
+      const minion = POOL[L % POOL.length];
+      lvlWaves.push({ t: 0.5, enemy: minion, n: 3 + Math.floor(L / 6), interval: 0.35, hpMul: hpMul });
+      const b = bossOf(L);
+      lvlWaves.push({ t: 3.2, enemy: b.enemy, n: 1, boss: true, name: b.name, hpMul: 1 });
+    } else {
+      const nWaves = 3 + Math.floor(L / 5);
+      let t = 0.5;
+      for (let w = 0; w < nWaves; w++) {
+        const e = POOL[(L * 2 + w) % POOL.length];
+        lvlWaves.push({ t: t, enemy: e, n: 3 + Math.floor(L / 7), interval: Math.max(0.16, 0.42 - L * 0.005), hpMul: hpMul });
+        t += 1.5 + (w % 2) * 0.5;
+      }
+    }
+  }
+  function onLevelClear() {
+    level++;
+    engine.saveState({ level: level });
+    if (level >= LVL_COUNT) { engine.gameOver({ label: (LB.win || 'МИР СПАСЁН!') }); return; }
+    const wasBoss = isBossLevel(level - 1);
+    if (isBossLevel(level)) { const nb = bossOf(level); interLines = ['⚠ ' + (nb.name || 'БОСС'), nb.story || '']; interT = 3.4; }
+    else if (wasBoss) { const pb2 = bossOf(level - 1); interLines = [(pb2.name || 'Босс') + ' повержен', pb2.win || '']; interT = 3.2; }
+    else { interLines = ['УРОВЕНЬ ' + (level + 1)]; interT = 1.3; }
+    buildLevel(level);
+  }
+  function sprOf(def, ent) {
+    if (def.imgs && def.imgs.length) { const n = def.imgs.length; const i = Math.floor((ent ? ent.t : time) * (def.fps || 6)) % n; return engine.img(def.imgs[i]); }
+    if (def.img) return engine.img(def.img);
+    return null;
+  }
+  function drawBossBar(ctx, f) {
+    const bw = Math.max(60, f.w * 1.5), x = f.x - bw / 2, y = f.y - f.h * 0.85 - 9;
+    const frac = Math.max(0, f.hp / (f.maxHp || f.hp || 1));
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(x - 1, y - 1, bw + 2, 6);
+    ctx.fillStyle = '#ff5a6a'; ctx.fillRect(x, y, bw * frac, 4);
+  }
+  function wrapText(ctx, text, cx, y, maxW, lh) {
+    if (!text) return;
+    const words = String(text).split(' '); let line = '', yy = y;
+    for (let i = 0; i < words.length; i++) {
+      const test = line ? line + ' ' + words[i] : words[i];
+      if (ctx.measureText(test).width > maxW && line) { ctx.fillText(line, cx, yy); line = words[i]; yy += lh; }
+      else line = test;
+    }
+    if (line) ctx.fillText(line, cx, yy);
+  }
+
   function reset() {
     p = { x: W / 2, y: H * 0.8, hp: PL.hp, bombs: PL.bombs, lvl: 0, pol: 0, inv: 0, dead: false };
-    foes = []; eb = []; pb = []; drops = [];
+    foes = []; eb = []; pb = []; drops = []; pending = [];
     time = 0; waveT = 0; waveIdx = 0; loopN = 0; shootT = 0; target = null;
+    interT = 0; interLines = null;
     stars = [];
     for (let i = 0; i < 40; i++) stars.push({ x: Math.random() * W, y: Math.random() * H, s: 0.4 + Math.random() * 1.6 });
     layoutButtons();
+    if (MODE === 'levels') {
+      const sv = engine.loadState && engine.loadState();
+      level = (sv && sv.level | 0) || 0;
+      if (level >= LVL_COUNT || level < 0) level = 0;
+      buildLevel(level);
+      if (level === 0 && INTRO) { interLines = INTRO; interT = 4.0; }
+      else if (isBossLevel(level)) { const nb = bossOf(level); interLines = ['⚠ ' + (nb.name || 'БОСС'), nb.story || '']; interT = 3.0; }
+      else { interLines = ['УРОВЕНЬ ' + (level + 1)]; interT = 1.1; }
+    }
   }
   function layoutButtons() {
     btns = [];
@@ -71,10 +146,13 @@ Engine.register('shmup', function (engine, cfg) {
     for (let i = 0; i < n; i++) {
       setTimeoutSim(i * (w.interval || 0.35), function (k) {
         const fx = (w.x != null) ? w.x * W : (n === 1 ? W / 2 : (0.15 + 0.7 * (k / Math.max(1, n - 1))) * W);
-        foes.push({ def: def, x: fx, y: -30, w: def.w || 26, h: def.h || 24,
-          hp: (def.hp || 1) * Math.pow(LOOP.hpMul, loopN), t: Math.random() * 6,
+        const hpm = w.hpMul != null ? w.hpMul : Math.pow(LOOP.hpMul, loopN);
+        const hp = (def.hp || 1) * hpm * (w.boss ? 1 : 1);
+        foes.push({ def: def, x: fx, y: w.boss ? -60 : -30, w: def.w || 26, h: def.h || 24,
+          hp: hp, maxHp: hp, t: Math.random() * 6,
           gunT: (def.gun ? def.gun.cooldown * (0.5 + Math.random()) : 0),
-          baseX: fx, pol: def.gun && def.gun.pol != null ? def.gun.pol : ((Math.random() * 2) | 0) });
+          baseX: fx, pol: def.gun && def.gun.pol != null ? def.gun.pol : ((Math.random() * 2) | 0),
+          boss: !!w.boss, name: w.name || null });
       }, i);
     }
   }
@@ -141,13 +219,17 @@ Engine.register('shmup', function (engine, cfg) {
       // ── скролл-звёзды ──
       stars.forEach(s => { s.y += SC.speed * s.s * dt; if (s.y > H) { s.y = -4; s.x = Math.random() * W; } });
 
-      // ── расписание волн (+луп со сложностью) ──
-      waveT += dt;
-      while (waveIdx < WAVES.length && WAVES[waveIdx].t * Math.pow(LOOP.rateMul, loopN) <= waveT) {
-        spawnWave(WAVES[waveIdx]); waveIdx++;
-      }
-      if (waveIdx >= WAVES.length && foes.length === 0 && pending.length === 0) {
-        loopN++; waveIdx = 0; waveT = 0;                 // новый круг сложнее
+      // ── расписание волн ──
+      if (interT > 0) {
+        interT -= dt;                                    // интерлюдия: пауза спавна (текст в hud)
+      } else if (MODE === 'levels') {
+        lvlWaveT += dt;
+        while (lvlWaveIdx < lvlWaves.length && lvlWaves[lvlWaveIdx].t <= lvlWaveT) { spawnWave(lvlWaves[lvlWaveIdx]); lvlWaveIdx++; }
+        if (lvlWaveIdx >= lvlWaves.length && foes.length === 0 && pending.length === 0) onLevelClear();
+      } else {
+        waveT += dt;                                     // endless: луп со сложностью
+        while (waveIdx < WAVES.length && WAVES[waveIdx].t * Math.pow(LOOP.rateMul, loopN) <= waveT) { spawnWave(WAVES[waveIdx]); waveIdx++; }
+        if (waveIdx >= WAVES.length && foes.length === 0 && pending.length === 0) { loopN++; waveIdx = 0; waveT = 0; }
       }
       for (let i = pending.length - 1; i >= 0; i--) { pending[i].t -= dt; if (pending[i].t <= 0) { pending[i].fn(pending[i].arg); pending.splice(i, 1); } }
 
@@ -243,33 +325,50 @@ Engine.register('shmup', function (engine, cfg) {
         ctx.fillStyle = '#222'; ctx.font = 'bold 12px ' + FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(d.kind === 'up' ? 'P' : d.kind === 'bomb' ? 'B' : '+', d.x, d.y + bob + 1);
       });
-      // враги
+      // враги (спрайт, если задан def.img/imgs; иначе треугольник)
       foes.forEach(f => {
-        ctx.fillStyle = f.def.color || '#e07070';
-        ctx.beginPath();
-        ctx.moveTo(f.x, f.y + f.h / 2); ctx.lineTo(f.x - f.w / 2, f.y - f.h / 2);
-        ctx.lineTo(f.x + f.w / 2, f.y - f.h / 2); ctx.closePath(); ctx.fill();
-        ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.stroke();
+        const im = sprOf(f.def, f);
+        if (im) {
+          const sc = f.def.imgScale || 1.7;
+          const dw = f.w * sc, dh = f.h * sc;
+          if (f.flash > 0) ctx.globalAlpha = 0.6;
+          ctx.drawImage(im, f.x - dw / 2, f.y - dh / 2, dw, dh);
+          ctx.globalAlpha = 1;
+        } else {
+          ctx.fillStyle = f.def.color || '#e07070';
+          ctx.beginPath();
+          ctx.moveTo(f.x, f.y + f.h / 2); ctx.lineTo(f.x - f.w / 2, f.y - f.h / 2);
+          ctx.lineTo(f.x + f.w / 2, f.y - f.h / 2); ctx.closePath(); ctx.fill();
+          ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.stroke();
+        }
         if (POLAR) { ctx.fillStyle = PCOL[f.pol]; ctx.beginPath(); ctx.arc(f.x, f.y, 4, 0, 7); ctx.fill(); }
+        if (f.boss) drawBossBar(ctx, f);
       });
-      // пули игрока
-      ctx.fillStyle = '#eaffff';
-      pb.forEach(b => ctx.fillRect(b.x - 2, b.y - 6, 4, 10));
+      // пули игрока (спрайт пули, если задан)
+      const bim = WPN.bulletImg && engine.img(WPN.bulletImg);
+      if (bim) pb.forEach(b => { const s = WPN.bulletSize || 14; ctx.drawImage(bim, b.x - s / 2, b.y - s / 2, s, s); });
+      else { ctx.fillStyle = '#eaffff'; pb.forEach(b => ctx.fillRect(b.x - 2, b.y - 6, 4, 10)); }
       // пули врагов (цвет = полярность)
       eb.forEach(b => {
         ctx.fillStyle = POLAR ? PCOL[b.pol] : '#ff9e9e';
         ctx.beginPath(); ctx.arc(b.x, b.y, 4.5, 0, 7); ctx.fill();
         ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1; ctx.stroke();
       });
-      // игрок (мигает в i-frames): кораблик-акула
+      // игрок (мигает в i-frames)
       if (!(p.inv > 0 && Math.floor(time * 14) % 2 === 0)) {
         const col = POLAR ? PCOL[p.pol] : PL.color;
-        ctx.fillStyle = col;
-        ctx.beginPath();
-        ctx.moveTo(p.x, p.y - PL.h / 2); ctx.lineTo(p.x - PL.w / 2, p.y + PL.h / 2);
-        ctx.lineTo(p.x, p.y + PL.h * 0.28); ctx.lineTo(p.x + PL.w / 2, p.y + PL.h / 2);
-        ctx.closePath(); ctx.fill();
-        ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1.5; ctx.stroke();
+        const pim = PL.img && engine.img(PL.img);
+        if (pim) {
+          const sc = PL.imgScale || 1.6, dw = PL.w * sc, dh = PL.h * sc;
+          ctx.drawImage(pim, p.x - dw / 2, p.y - dh / 2, dw, dh);
+        } else {
+          ctx.fillStyle = col;
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y - PL.h / 2); ctx.lineTo(p.x - PL.w / 2, p.y + PL.h / 2);
+          ctx.lineTo(p.x, p.y + PL.h * 0.28); ctx.lineTo(p.x + PL.w / 2, p.y + PL.h / 2);
+          ctx.closePath(); ctx.fill();
+          ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1.5; ctx.stroke();
+        }
         // ядро-хитбокс (Touhou-style, видно всегда)
         ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(p.x, p.y, PL.hitboxR, 0, 7); ctx.fill();
         ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(p.x, p.y, PL.hitboxR + 2, 0, 7); ctx.stroke();
@@ -288,10 +387,11 @@ Engine.register('shmup', function (engine, cfg) {
       // счёт
       ctx.fillStyle = '#fff'; ctx.font = 'bold 16px ' + FONT; ctx.textAlign = 'right';
       ctx.fillText(String(engine.score), W - 14, 20);
-      // уровень оружия + круг сложности
+      // уровень оружия + прогресс кампании / круг
       ctx.font = 'bold 11px ' + FONT;
       ctx.fillStyle = 'rgba(255,255,255,0.75)';
-      ctx.fillText('PWR ' + (p.lvl + 1) + (loopN ? '  ЦИКЛ ' + (loopN + 1) : ''), W - 14, 40);
+      const prog = MODE === 'levels' ? '  УР ' + (level + 1) + '/' + LVL_COUNT : (loopN ? '  ЦИКЛ ' + (loopN + 1) : '');
+      ctx.fillText('PWR ' + (p.lvl + 1) + prog, W - 14, 40);
       // кнопки
       btns.forEach(b => {
         ctx.fillStyle = 'rgba(255,255,255,0.16)';
@@ -301,9 +401,20 @@ Engine.register('shmup', function (engine, cfg) {
         ctx.font = 'bold ' + Math.round(b.r * 0.85) + 'px sans-serif'; ctx.textAlign = 'center';
         ctx.fillText(b.glyph, b.x, b.y + 1);
       });
-      if (time < 3) {
+      if (time < 3 && interT <= 0) {
         ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.font = 'bold 14px ' + FONT; ctx.textAlign = 'center';
-        ctx.fillText(LB.hint || 'Веди пальцем · ✦ бомба' + (POLAR ? ' · ⇄ цвет' : ''), W / 2, H * 0.3);
+        ctx.fillText(LB.hint || 'Веди пальцем · ✦ бомба' + (POLAR ? ' · ⇄ цвет' : ''), W / 2, H * 0.32);
+      }
+      // интерлюдия/история между уровнями
+      if (interT > 0 && interLines) {
+        ctx.fillStyle = 'rgba(6,4,12,' + (0.72 * Math.min(1, interT * 2)).toFixed(2) + ')';
+        ctx.fillRect(0, H * 0.30, W, H * 0.40);
+        ctx.textAlign = 'center';
+        ctx.fillStyle = (cfg.theme && cfg.theme.accent) || '#ffd24a';
+        ctx.font = 'bold ' + Math.round(W * 0.072) + 'px ' + FONT;
+        ctx.fillText(interLines[0] || '', W / 2, H * 0.40);
+        ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.font = Math.round(W * 0.042) + 'px ' + FONT;
+        wrapText(ctx, interLines[1] || '', W / 2, H * 0.47, W * 0.82, W * 0.056);
       }
     },
 
@@ -327,7 +438,9 @@ Engine.register('shmup', function (engine, cfg) {
     _state: function () {
       return { hp: p.hp, bombs: p.bombs, lvl: p.lvl, pol: p.pol, x: p.x, y: p.y,
         foes: foes.length, eb: eb.length, pb: pb.length, drops: drops.length,
-        loopN: loopN, waveIdx: waveIdx, inv: p.inv };
+        loopN: loopN, waveIdx: waveIdx, inv: p.inv,
+        level: level, interT: +interT.toFixed(2), interLines: interLines,
+        boss: (function () { const b = foes.find(f => f.boss); return b ? { hp: b.hp, maxHp: b.maxHp, name: b.name } : null; })() };
     },
     _spawnBullet: function (x, y, vx, vy, pol) { eb.push({ x: x, y: y, vx: vx, vy: vy, pol: pol || 0, grazed: false }); },
     _spawnDrop: function (x, y, kind) { drops.push({ x: x, y: y, kind: kind, t: 0 }); },

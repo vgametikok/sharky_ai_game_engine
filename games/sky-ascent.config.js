@@ -3,8 +3,11 @@
    прыгаешь снизу вверх), движущиеся платформы, пружины-катапульты, монеты,
    летуны-враги и чекпоинты. Двойной прыжок — с самого старта. Камера едет
    вверх вслед за подъёмом, светлое небо-градиент заполняет экран.
-   Цель — добраться до вершины (выход). Башня строится программно. */
+   Цель — добраться до вершины (выход). Башня строится программно.
+   Спрайты (существо-скалолаз, мотылёк) — PixelLab (sky-ascent.px.js), иначе плейсхолдеры. */
 'use strict';
+let px = {}; try { px = require('./sky-ascent.px.js'); } catch (e) { /* до упаковки */ }
+const animIf = (n, m) => (px[n] ? m : null);          // анимация только если спрайт реально есть
 
 const GW = 13, GH = 66;
 function buildTower() {
@@ -59,6 +62,7 @@ function buildTower() {
 module.exports = {
   genre: 'platformer',
   meta: { title: 'Ввысь' },
+  assets: px,
   theme: {
     accent: '#ffd24a',
     bgTop: '#8fd4f0', bgBottom: '#e8b7d8',   // рассветное небо: голубое сверху → розовое снизу
@@ -69,13 +73,16 @@ module.exports = {
   platformer: {
     tileSize: 16, viewTilesX: 13, mode: 'levels',
     physics: { gravity: 1450, moveSpeed: 128, jumpVel: 430, dashSpeed: 300, dashTime: 0.16 },
+    saveCheckpoint: true,                              // возобновление с последнего чекпоинта
     player: {
       w: 0.7, h: 0.92, hp: 3, lives: 3, color: '#ff7a4d',
       abilities: { doubleJump: true },
       checkpointHeal: true,
+      anims: animIf('player', { idle: { imgs: ['player'], fps: 1, w: 1.4, h: 1.6 } }),
     },
     enemies: {
-      moth: { w: 0.8, h: 0.7, hp: 1, dmg: 1, speed: 42, ai: 'fly', fly: true, range: 5, score: 40, color: '#b06fd1', stompable: true },
+      moth: { w: 0.8, h: 0.7, hp: 1, dmg: 1, speed: 42, ai: 'fly', fly: true, range: 5, score: 40, color: '#b06fd1', stompable: true,
+        anims: animIf('moth', { idle: { imgs: ['moth'], fps: 1, w: 1.3, h: 1.2 } }) },
     },
     legend: {
       '#': { tile: true, solid: true, color: '#c9a06a' },

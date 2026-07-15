@@ -110,6 +110,7 @@ Engine.register('platformer', function (engine, cfg) {
   // ── волна A: spelunky / nintendo / метроидвания ──
   const SUITS = P.suits || null;                       // костюмы {id:{color,speedMul,jumpMul,abilities}}
   const MAPCFG = P.map || null;                        // мини-карта метроидвании
+  const SAVE_CP = !!P.saveCheckpoint;                  // сохранять последний костёр между сессиями
   let worldFlags = {};                                 // флаги мира (бэктрекинг тайлов по ifFlag)
   let stars = 0;                                       // скрытые звёзды за особые прохождения
   let visited = {};                                    // посещённые экраны 'sx,sy'
@@ -1234,6 +1235,8 @@ Engine.register('platformer', function (engine, cfg) {
       combo = 0; comboT = 0; toasts = []; choosing = null; bonusT = 0;
       worldFlags = {}; stars = 0; visited = {}; mapMarkers = {}; mapOpen = false; slowHeld = false;
       loadLevel();
+      // возобновление с сохранённого костра (соулслайк/climber)
+      if (SAVE_CP) { const sv = engine.loadState && engine.loadState(); if (sv && sv.cp) { respawnPt = { x: sv.cp[0], y: sv.cp[1] }; playerToRespawn(); ents.forEach(function (e) { if (e.kind === 'checkpoint' && Math.abs(e.x - sv.cp[0]) < TS && Math.abs(e.y - sv.cp[1]) < TS) e.lit = true; }); } }
       cam.x = Math.max(0, player.x - viewW / 2); cam.y = 0;
     },
     layout: function (Lx) {
@@ -1423,6 +1426,7 @@ Engine.register('platformer', function (engine, cfg) {
           if (!e.lit) {
             for (let j = 0; j < ents.length; j++) if (ents[j].kind === 'checkpoint') ents[j].lit = false;
             e.lit = true; respawnPt = { x: e.x, y: e.y };
+            if (SAVE_CP) engine.saveState({ cp: [e.x, e.y] });
             if (PLDEF.checkpointHeal) { player.hp = player.maxHp; if (stam()) player.stamina = stam().max; }
             sfx('check'); burstAt(e.x + TS / 2, e.y, { count: 10, color: '#8f8' });
           }
