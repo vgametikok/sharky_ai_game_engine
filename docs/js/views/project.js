@@ -1,7 +1,7 @@
 // Страница генерации: прогресс → окно игры + окно ассетов (чаты) → финал → играть/скачать/опубликовать.
 import { h, toast, extractJson } from '../ui.js';
 import { getProject, updateProject, listMessages, addMessage } from '../db.js';
-import { llm, pixellab, publishGame } from '../api.js';
+import { llm, pixellab, publishGame, updateGame } from '../api.js';
 import { buildHtml } from '../builder.js';
 import { makerSystemPrompt, briefMessage, finalIntegrationMessage, assetsChatSystem } from '../prompts.js';
 import { GENRES, STAGE_LABELS } from '../catalog.js';
@@ -369,17 +369,61 @@ export default async function projectView([id]) {
       },
     }, '🦈 Опубликовать в Sharky');
 
+    // ── Обновление опубликованной игры: пересборка html + выбор судьбы
+    // прогресса игроков (сохранить облачные сейвы или стереть). ──
+    const updPanel = published && (() => {
+      const noteInp = h('input', { type: 'text', placeholder: 'что нового (заметка к версии)…', maxlength: 300, style: 'flex:1' });
+      const keepR = h('input', { type: 'radio', name: 'updprog', checked: true });
+      const wipeR = h('input', { type: 'radio', name: 'updprog' });
+      const goBtn = h('button.btn.big.primary', {
+        onclick: async () => {
+          const wipe = wipeR.checked;
+          const warn = wipe
+            ? `Выпустить обновление «${st.p.title}» и БЕЗВОЗВРАТНО стереть облачный прогресс всех игроков?`
+            : `Выпустить обновление «${st.p.title}»? Прогресс игроков сохранится.`;
+          if (!confirm(warn)) return;
+          goBtn.disabled = true; goBtn.textContent = 'обновляю…';
+          try {
+            const html = await buildHtml(st.config, assetMap());
+            const res = await updateGame({
+              game_id: st.p.published_game_id,
+              html,
+              note: noteInp.value.trim() || null,
+              wipe_progress: wipe,
+            });
+            let msg = `Обновление вышло: v${res.version}`;
+            if (wipe) msg += res.wiped ? ` · прогресс стёрт (${res.deleted ?? 0} сейвов)` : '';
+            toast(msg);
+            if (wipe && !res.wiped) toast('Обновление вышло, но прогресс стереть не удалось: ' + (res.wipe_error || '?') + ' — повтори сброс ещё раз', true);
+            noteInp.value = '';
+          } catch (err) { toast(err.message, true); }
+          goBtn.disabled = false; goBtn.textContent = '🔄 Выпустить обновление';
+        },
+      }, '🔄 Выпустить обновление');
+      return h('div.panel', { style: 'margin-top:10px' },
+        h('h3', {}, 'Обновление игры'),
+        h('p.hint', {}, 'Пересоберёт игру из текущего конфига и заменит опубликованную версию. Правь игру в чате ниже, потом выпускай.'),
+        h('div.row', {}, noteInp),
+        h('div.row', { style: 'margin-top:6px; gap:14px' },
+          h('label', { style: 'display:flex; gap:6px; align-items:center' }, keepR, ' сохранить прогресс игроков'),
+          h('label', { style: 'display:flex; gap:6px; align-items:center' }, wipeR, ' стереть прогресс (сломан формат сейвов)'),
+        ),
+        h('div.row', { style: 'margin-top:8px' }, goBtn),
+      );
+    })();
+
     root.append(
       h('div.workgrid', { style: 'grid-template-columns: 1.2fr 1fr' },
         h('div.win', {},
-          h('h3', {}, h('span', {}, published ? '🦈 На модерации' : '🏁 Готовая игра')),
+          h('h3', {}, h('span', {}, published ? '🦈 Опубликована' : '🏁 Готовая игра')),
           frame,
           h('div.row', {},
             h('button.btn.ghost', { onclick: () => rebuildFrame(true) }, '↻ перезапустить'),
             dl, pub,
             published && h('span.badge.violet', {}, 'id: ' + st.p.published_game_id),
           ),
-          published && h('p.hint', {}, 'Игра появится в ленте, когда админ опубликует её в админке Sharky.'),
+          published && h('p.hint', {}, 'Новая игра появится в ленте после модерации админом; обновления выходят сразу.'),
+          updPanel,
         ),
         h('div.win', {},
           h('h3', {}, h('span', {}, '💬 Доработка')),

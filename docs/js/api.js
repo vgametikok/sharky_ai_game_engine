@@ -28,3 +28,7 @@ export const pixellab = (p) => callFn('maker-pixellab', p);
 
 // {project_id, html, title, ...} → {game_id, src}
 export const publishGame = (p) => callFn('maker-publish', p);
+
+// Обновление опубликованной игры и/или сброс прогресса игроков.
+// {game_id, html?, note?, wipe_progress?} → {game_id, version, src, wiped, deleted?, wipe_error?}
+export const updateGame = (p) => callFn('game-update', p);
