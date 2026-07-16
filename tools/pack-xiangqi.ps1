@@ -11,7 +11,7 @@ $dir = Join-Path $root 'tools\px-xiangqi'
 New-Item -ItemType Directory -Force $dir | Out-Null
 $items = Get-Content (Join-Path $root $Manifest) -Raw | ConvertFrom-Json
 
-function Normalize-Piece([string]$inPath, [string]$outPath, [int]$canvas) {
+function Normalize-Piece([string]$inPath, [string]$outPath, [int]$canvas, [string]$mode) {
     $src = [System.Drawing.Bitmap]::new($inPath)
     try {
         # bbox by alpha > 15
@@ -38,7 +38,8 @@ function Normalize-Piece([string]$inPath, [string]$outPath, [int]$canvas) {
         $g = [System.Drawing.Graphics]::FromImage($dst)
         $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::NearestNeighbor
         $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::Half
-        $dx = [int](($canvas - $bw) / 2); $dy = $canvas - 4 - $bh
+        $dx = [int](($canvas - $bw) / 2)
+        if ($mode -eq 'center') { $dy = [int](($canvas - $bh) / 2) } else { $dy = $canvas - 4 - $bh }
         if ($dy -lt 0) { $dy = 0 }
         $g.DrawImage($src, [System.Drawing.Rectangle]::new($dx, $dy, $bw, $bh),
             [System.Drawing.Rectangle]::new($minX, $minY, $bw, $bh), [System.Drawing.GraphicsUnit]::Pixel)
@@ -58,7 +59,7 @@ foreach ($it in $items) {
     if (-not (Test-Path $raw)) {
         Invoke-WebRequest -Uri ("https://api.pixellab.ai/mcp/map-objects/{0}/download" -f $it.id) -OutFile $raw -UseBasicParsing
     }
-    if ($it.norm) { Normalize-Piece $raw $fin 64 } else { Copy-Item $raw $fin -Force }
+    if ($it.norm) { Normalize-Piece $raw $fin 64 $it.mode } else { Copy-Item $raw $fin -Force }
     $b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($fin))
     [void]$sb.AppendLine("  $($it.k): '$b64',")
     Write-Output ("packed {0} ({1} b64 chars)" -f $it.k, $b64.Length)

@@ -350,6 +350,36 @@ Engine.register('xiangqi', function (engine, cfg) {
   };
   const LVL_NAMES = ['Новичок', 'Ученик', 'Боец', 'Мастер', 'Гроссмейстер'];
 
+  // ═══════════════ СКИНЫ (наборы фигур/досок) ═══════════════
+  // pre — префикс ключей спрайтов; flat — классика (диск-спрайт + иероглиф
+  // шрифтом, отдельных фигур нет); disc* = [светлый, тёмный, кольцо]
+  const SKINS = {
+    figures: { name: 'Фигуры', pre: '', board: 'board', ins: 0.115,
+      grid: 'rgba(58,30,10,0.75)', river: 'rgba(58,30,10,0.55)',
+      edge: 'rgba(66,34,12,0.9)', fb: ['#d8b070', '#b88a48'],
+      discR: ['#f4d9a0', '#caa05c', '#a02818'], discB: ['#5a5f6e', '#2c303c', '#8de0c0'],
+      glyphR: '#7a1408', glyphB: '#bfe8d8' },
+    classic: { name: 'Классика', pre: '', board: 'board', ins: 0.115, flat: ['clR', 'clB'],
+      grid: 'rgba(58,30,10,0.75)', river: 'rgba(58,30,10,0.55)',
+      edge: 'rgba(66,34,12,0.9)', fb: ['#d8b070', '#b88a48'],
+      discR: ['#f0d8a8', '#c8a060', '#a02818'], discB: ['#3a3630', '#181410', '#3aa070'],
+      glyphR: '#8c1410', glyphB: '#c8f0d8' },
+    cyber: { name: 'Киберпанк', pre: 'cy_', board: 'cyBoard', ins: 0.17,
+      grid: 'rgba(80,235,255,0.45)', river: 'rgba(150,240,255,0.85)', glow: '#40e0ff',
+      edge: 'rgba(30,140,160,0.9)', fb: ['#141824', '#0a0c14'],
+      discR: ['#4a1638', '#200a1c', '#ff45b0'], discB: ['#103440', '#081418', '#38f0ff'],
+      glyphR: '#ff8ad0', glyphB: '#a0f4ff',
+      bg: ['#150b28', '#060310'], neon: true, badge: true },
+    animals: { name: 'Зверята', pre: 'an_', board: 'anBoard', ins: 0.2,
+      grid: 'rgba(70,105,40,0.65)', river: 'rgba(50,115,160,0.75)',
+      edge: 'rgba(88,135,58,0.95)', fb: ['#cfe8a0', '#a8d078'],
+      discR: ['#ffedc8', '#f0b060', '#e05030'], discB: ['#d8f0ff', '#80bce4', '#2878b8'],
+      glyphR: '#a03818', glyphB: '#184a78',
+      bg: ['#33481f', '#16200e'] },
+  };
+  const SKIN_ORDER = ['figures', 'classic', 'cyber', 'animals'];
+  function skin() { return SKINS[SET.k] || SKINS.figures; }
+
   // ═══════════════ СОСТОЯНИЕ ИГРЫ / UI ═══════════════
   let W = 360, H = 640, headerH = 70;
   let ui = 'menu';                       // menu | settings | play
@@ -364,7 +394,7 @@ Engine.register('xiangqi', function (engine, cfg) {
   let hintCard = null;                   // {t, black, x, y}
   let lastTap = { t: 0, x: 0, y: 0 };
   let checkFlash = 0;
-  let SET = { d: 1, o: 'auto', m: true, snd: true };
+  let SET = { d: 1, o: 'auto', m: true, snd: true, k: 'figures' };
   let wins = 0, scoreP = 0;
   let btns = [];                         // хит-зоны текущего экрана
   // геометрия доски
@@ -391,7 +421,7 @@ Engine.register('xiangqi', function (engine, cfg) {
     return b;
   }
   function saveObj() {
-    return { v: 1, s: { d: SET.d, o: SET.o, m: SET.m, snd: SET.snd },
+    return { v: 1, s: { d: SET.d, o: SET.o, m: SET.m, snd: SET.snd, k: SET.k },
       g: gameOn ? { b: serialize(), t: turn, mc: mc, idle: idle,
                     capR: capR.join(''), capB: capB.join(''), h: hist } : null,
       w: wins, sc: scoreP };
@@ -405,7 +435,10 @@ Engine.register('xiangqi', function (engine, cfg) {
     let o = engine.loadState();
     if (!o) { try { o = JSON.parse(localStorage.getItem('xiangqi_save')); } catch (e) {} }
     if (!o || o.v !== 1) return;
-    if (o.s) { SET.d = o.s.d || 1; SET.o = o.s.o || 'auto'; SET.m = o.s.m !== false; SET.snd = o.s.snd !== false; }
+    if (o.s) {
+      SET.d = o.s.d || 1; SET.o = o.s.o || 'auto'; SET.m = o.s.m !== false; SET.snd = o.s.snd !== false;
+      SET.k = SKINS[o.s.k] ? o.s.k : 'figures';
+    }
     wins = o.w || 0; scoreP = o.sc || 0;
     if (o.g && o.g.b) {
       bd = deserialize(o.g.b); turn = o.g.t === 'b' ? 'b' : 'r';
@@ -502,14 +535,15 @@ Engine.register('xiangqi', function (engine, cfg) {
   function pieceKey(p) { return (p > BLACK ? 'b' : 'r') + TYPE_CH[p & 7]; }
 
   function drawBoardBase(ctx) {
+    const K = skin();
     const gx = horiz ? 9 : 8, gy = horiz ? 8 : 9;
     const bx = ox - pad, by = oy - pad, bw = gx * cell + pad * 2, bh = gy * cell + pad * 2;
-    const img = spr('board');
+    const img = spr(K.board);
     ctx.save();
     engine.rr(bx, by, bw, bh, cell * 0.25); ctx.clip();
     if (img) {
-      // берём внутреннюю «пергаментную» часть текстуры (рама картинки — только в меню)
-      const ins = 0.115, iw = img.naturalWidth, ih = img.naturalHeight;
+      // берём внутреннюю часть текстуры (рама картинки — только в меню)
+      const ins = K.ins, iw = img.naturalWidth, ih = img.naturalHeight;
       const sx0 = iw * ins, sy0 = ih * ins, sw = iw - sx0 * 2, sh = ih - sy0 * 2;
       if (horiz) {                                   // доску-текстуру поворачиваем под раскладку
         ctx.translate(bx + bw / 2, by + bh / 2); ctx.rotate(Math.PI / 2);
@@ -517,15 +551,16 @@ Engine.register('xiangqi', function (engine, cfg) {
       } else ctx.drawImage(img, sx0, sy0, sw, sh, bx, by, bw, bh);
     } else {
       const g = ctx.createLinearGradient(bx, by, bx + bw, by + bh);
-      g.addColorStop(0, '#d8b070'); g.addColorStop(1, '#b88a48');
+      g.addColorStop(0, K.fb[0]); g.addColorStop(1, K.fb[1]);
       ctx.fillStyle = g; ctx.fillRect(bx, by, bw, bh);
     }
     ctx.restore();
-    ctx.strokeStyle = 'rgba(66,34,12,0.9)'; ctx.lineWidth = Math.max(2, cell * 0.07);
+    ctx.strokeStyle = K.edge; ctx.lineWidth = Math.max(2, cell * 0.07);
     engine.rr(bx, by, bw, bh, cell * 0.25); ctx.stroke();
 
     // сетка (через трансформацию точек — работает в обеих раскладках)
-    ctx.strokeStyle = 'rgba(58,30,10,0.75)'; ctx.lineWidth = Math.max(1, cell * 0.035);
+    if (K.neon) { ctx.save(); ctx.shadowColor = K.glow; ctx.shadowBlur = Math.max(3, cell * 0.12); }
+    ctx.strokeStyle = K.grid; ctx.lineWidth = Math.max(1, cell * 0.035);
     ctx.beginPath();
     for (let y = 0; y < 10; y++) { ctx.moveTo(sx(0, y), sy(0, y)); ctx.lineTo(sx(8, y), sy(8, y)); }
     for (let x = 0; x < 9; x++) {
@@ -556,8 +591,10 @@ Engine.register('xiangqi', function (engine, cfg) {
       });
       ctx.stroke();
     }
+    if (K.neon) ctx.restore();
     // река
-    ctx.fillStyle = 'rgba(58,30,10,0.55)';
+    if (K.neon) { ctx.save(); ctx.shadowColor = K.glow; ctx.shadowBlur = cell * 0.3; }
+    ctx.fillStyle = K.river;
     ctx.font = Math.round(cell * 0.55) + 'px ' + FONT;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     const rX1 = (sx(2, 4) + sx(2, 5)) / 2, rY1 = (sy(2, 4) + sy(2, 5)) / 2;
@@ -566,36 +603,58 @@ Engine.register('xiangqi', function (engine, cfg) {
       ctx.save(); ctx.translate(rX1, rY1); ctx.rotate(Math.PI / 2); ctx.fillText('楚 河', 0, 0); ctx.restore();
       ctx.save(); ctx.translate(rX2, rY2); ctx.rotate(Math.PI / 2); ctx.fillText('漢 界', 0, 0); ctx.restore();
     } else { ctx.fillText('楚 河', rX1, rY1); ctx.fillText('漢 界', rX2, rY2); }
+    if (K.neon) ctx.restore();
   }
 
-  function drawPiece(ctx, p, X, Y, scale) {
-    const r = cell * 0.42 * (scale || 1);
-    const black = p > BLACK;
-    // диск-основание
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    ctx.beginPath(); ctx.ellipse(X, Y + r * 0.28, r * 1.02, r * 0.5, 0, 0, 7); ctx.fill();
+  function discBase(ctx, X, Y, r, K, black) {
+    const c = black ? K.discB : K.discR;
     const g = ctx.createRadialGradient(X - r * 0.3, Y - r * 0.3, r * 0.2, X, Y, r);
-    g.addColorStop(0, black ? '#5a5f6e' : '#f4d9a0');
-    g.addColorStop(1, black ? '#2c303c' : '#caa05c');
+    g.addColorStop(0, c[0]); g.addColorStop(1, c[1]);
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(X, Y, r, 0, 7); ctx.fill();
-    ctx.strokeStyle = black ? '#8de0c0' : '#a02818';
+    if (K.neon) { ctx.save(); ctx.shadowColor = c[2]; ctx.shadowBlur = r * 0.55; }
+    ctx.strokeStyle = c[2];
     ctx.lineWidth = Math.max(1.5, r * 0.12);
     ctx.beginPath(); ctx.arc(X, Y, r * 0.88, 0, 7); ctx.stroke();
+    if (K.neon) ctx.restore();
     ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.arc(X, Y, r, 0, 7); ctx.stroke();
-    // спрайт или иероглиф
-    const im = spr(pieceKey(p));
+  }
+  function glyphText(ctx, p, X, Y, size, color, glow) {
+    ctx.save();
+    if (glow) { ctx.shadowColor = glow; ctx.shadowBlur = size * 0.45; }
+    ctx.fillStyle = color;
+    ctx.font = 'bold ' + Math.round(size) + 'px serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(INFO[p & 7].hz[p > BLACK ? 1 : 0], X, Y);
+    ctx.restore();
+  }
+  // универсальная отрисовка фигуры радиусом r (доска, меню, карточка)
+  function drawPieceR(ctx, p, X, Y, r) {
+    const K = skin(), black = p > BLACK;
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath(); ctx.ellipse(X, Y + r * 0.28, r * 1.02, r * 0.5, 0, 0, 7); ctx.fill();
+    if (K.flat) {                                    // классика: диск + иероглиф шрифтом
+      const di = spr(K.flat[black ? 1 : 0]);
+      if (di) ctx.drawImage(di, X - r * 1.04, Y - r * 1.04, r * 2.08, r * 2.08);
+      else discBase(ctx, X, Y, r, K, black);
+      glyphText(ctx, p, X, Y + r * 0.02, r * 0.98, black ? K.glyphB : K.glyphR);
+      return;
+    }
+    discBase(ctx, X, Y, r, K, black);
+    const im = spr(K.pre + pieceKey(p));
     if (im) {
-      const s = cell * 1.06 * (scale || 1);
+      const s = r * 2.52;
       ctx.drawImage(im, X - s / 2, Y - s * 0.78, s, s);
+      // киберпанк: неон-иероглиф-бейдж на дворцовых фигурах и пушке
+      const t = p & 7;
+      if (K.badge && (t === TG || t === TA || t === TC))
+        glyphText(ctx, p, X - r * 0.72, Y - r * 0.52, r * 0.62, black ? K.glyphB : K.glyphR, black ? K.discB[2] : K.discR[2]);
     } else {
-      ctx.fillStyle = black ? '#bfe8d8' : '#7a1408';
-      ctx.font = 'bold ' + Math.round(r * 1.05) + 'px serif';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(INFO[p & 7].hz[black ? 1 : 0], X, Y + r * 0.03);
+      glyphText(ctx, p, X, Y + r * 0.03, r * 1.05, black ? K.glyphB : K.glyphR, K.neon ? (black ? K.discB[2] : K.discR[2]) : null);
     }
   }
+  function drawPiece(ctx, p, X, Y, scale) { drawPieceR(ctx, p, X, Y, cell * 0.42 * (scale || 1)); }
 
   function drawPlay(ctx) {
     drawBoardBase(ctx);
@@ -692,22 +751,7 @@ Engine.register('xiangqi', function (engine, cfg) {
     ctx.textAlign = 'center';
     ctx.fillText('коснитесь, чтобы закрыть', cx + cw / 2, cy + ch - 12);
   }
-  function drawPieceBig(ctx, p, X, Y, r) {
-    const black = p > BLACK;
-    const g = ctx.createRadialGradient(X - r * 0.3, Y - r * 0.3, r * 0.2, X, Y, r);
-    g.addColorStop(0, black ? '#5a5f6e' : '#f4d9a0'); g.addColorStop(1, black ? '#2c303c' : '#caa05c');
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(X, Y, r, 0, 7); ctx.fill();
-    ctx.strokeStyle = black ? '#8de0c0' : '#a02818'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(X, Y, r * 0.88, 0, 7); ctx.stroke();
-    const im = spr(pieceKey(p));
-    if (im) { const s = r * 2.5; ctx.drawImage(im, X - s / 2, Y - s * 0.78, s, s); }
-    else {
-      ctx.fillStyle = black ? '#bfe8d8' : '#7a1408';
-      ctx.font = 'bold ' + Math.round(r * 1.05) + 'px serif';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(INFO[p & 7].hz[black ? 1 : 0], X, Y + 1);
-    }
-  }
+  function drawPieceBig(ctx, p, X, Y, r) { drawPieceR(ctx, p, X, Y, r); }
   function drawMoveDiagram(ctx, t, cx, cy, c) {
     // сетка 5×5, фигура в центре; зелёные точки — ходы, серые — блокираторы
     ctx.strokeStyle = 'rgba(74,36,8,0.35)'; ctx.lineWidth = 1;
@@ -772,7 +816,7 @@ Engine.register('xiangqi', function (engine, cfg) {
   }
   function drawMenu(ctx) {
     // фон: доска в глубине
-    const img = spr('board');
+    const img = spr(skin().board);
     if (img) {
       ctx.globalAlpha = 0.25;
       const s = Math.max(W / img.naturalWidth, H / img.naturalHeight);
@@ -836,13 +880,23 @@ Engine.register('xiangqi', function (engine, cfg) {
     let y = H * 0.17;
     const step = Math.min(64, H * 0.105);
     settingRow(ctx, y, 'СЛОЖНОСТЬ', SET.d + ' — ' + LVL_NAMES[SET.d - 1], 'd'); y += step;
+    settingRow(ctx, y, 'НАБОР ФИГУР', skin().name, 'k'); y += step;
     settingRow(ctx, y, 'ДОСКА', oNames[SET.o], 'o'); y += step;
     settingRow(ctx, y, 'ПОДСВЕТКА ХОДОВ', SET.m ? 'Вкл' : 'Выкл', 'm'); y += step;
     settingRow(ctx, y, 'ЗВУК', SET.snd ? 'Вкл' : 'Выкл', 's'); y += step;
-    ctx.fillStyle = 'rgba(244,227,176,0.55)';
-    ctx.font = 'italic ' + Math.round(Math.min(W, H) * 0.034) + 'px ' + FONT;
-    ctx.textAlign = 'left';
-    wrap(ctx, 'Уровень 1 — для знакомства с игрой: противник поддаётся, а двойное касание фигуры объясняет, как она ходит.', W * 0.1, y + 14, W * 0.8, Math.min(W, H) * 0.045);
+    // предпросмотр набора: генерал + солдат обеих армий
+    const pr = Math.min(22, W * 0.055);
+    drawPieceR(ctx, TG, W / 2 - pr * 3.6, y + pr * 1.2, pr);
+    drawPieceR(ctx, TS, W / 2 - pr * 1.2, y + pr * 1.2, pr);
+    drawPieceR(ctx, TS + BLACK, W / 2 + pr * 1.2, y + pr * 1.2, pr);
+    drawPieceR(ctx, TG + BLACK, W / 2 + pr * 3.6, y + pr * 1.2, pr);
+    y += pr * 2.6;
+    if (y + Math.min(W, H) * 0.1 < H * 0.84) {
+      ctx.fillStyle = 'rgba(244,227,176,0.55)';
+      ctx.font = 'italic ' + Math.round(Math.min(W, H) * 0.034) + 'px ' + FONT;
+      ctx.textAlign = 'left';
+      wrap(ctx, 'Уровень 1 поддаётся — для знакомства с игрой. Двойной тап по фигуре — подсказка.', W * 0.1, y + 14, W * 0.8, Math.min(W, H) * 0.045);
+    }
     const bw = Math.min(W * 0.5, 190), bh = Math.min(48, H * 0.08);
     button(ctx, (W - bw) / 2, H * 0.88 - bh / 2, bw, bh, 'Назад', 'back');
   }
@@ -909,9 +963,13 @@ Engine.register('xiangqi', function (engine, cfg) {
     else if (id === 'settings') ui = 'settings';
     else if (id === 'back') { ui = 'menu'; save(); }
     else if (id === 'menu') { ui = 'menu'; sel = -1; }
-    else if (id.length === 2) {                        // настройки: d± o± m± s±
+    else if (id.length === 2) {                        // настройки: d± k± o± m± s±
       const k = id[0], dir = id[1] === '+' ? 1 : -1;
       if (k === 'd') SET.d = Math.min(5, Math.max(1, SET.d + dir));
+      else if (k === 'k') {
+        const i = SKIN_ORDER.indexOf(SET.k);
+        SET.k = SKIN_ORDER[(i + dir + SKIN_ORDER.length) % SKIN_ORDER.length];
+      }
       else if (k === 'o') {
         const opts = ['auto', 'v', 'h'], i = opts.indexOf(SET.o);
         SET.o = opts[(i + dir + 3) % 3]; layoutBoard();
@@ -978,6 +1036,12 @@ Engine.register('xiangqi', function (engine, cfg) {
     },
     render: function (ctx) {
       btns.length = 0;
+      const K = skin();
+      if (K.bg) {                                    // свой фон скина поверх темы
+        const g = ctx.createLinearGradient(0, 0, 0, H);
+        g.addColorStop(0, K.bg[0]); g.addColorStop(1, K.bg[1]);
+        ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      }
       if (ui === 'menu') drawMenu(ctx);
       else if (ui === 'settings') drawSettings(ctx);
       else drawPlay(ctx);
