@@ -1,0 +1,17 @@
+[
+  { "k": "board", "id": "7d5be9f5-bc0b-4ffd-a1ab-6fe3bb13611b", "norm": false },
+  { "k": "rG", "id": "92a3d733-95f1-4064-a869-4da65b96c48b", "norm": true },
+  { "k": "rA", "id": "eb13f678-7ef0-4182-8eb6-6c950388f62b", "norm": true },
+  { "k": "rE", "id": "c3c2ed57-5c6f-42a5-ba65-72d30f031c39", "norm": true },
+  { "k": "rH", "id": "ae1e44e1-066a-4f17-905d-4b8f2be8032c", "norm": true },
+  { "k": "rR", "id": "63d2f4d3-a2b6-4ee2-876a-6b4cb91af35f", "norm": true },
+  { "k": "rC", "id": "356a4310-82a8-4e51-9a8d-e068664b25b0", "norm": true },
+  { "k": "rS", "id": "7091a7c8-a482-452c-bfd6-dd5fc19e23bd", "norm": true },
+  { "k": "bG", "id": "69526267-03ef-4e7b-a502-a15b9f17b082", "norm": true },
+  { "k": "bA", "id": "76dad618-d72f-4a89-9ce5-4486eb3750e8", "norm": true },
+  { "k": "bE", "id": "5b7b29f2-6413-4e3b-b2a6-1ce4608f374a", "norm": true },
+  { "k": "bH", "id": "a96e60e5-0b91-48c7-9e99-4a3236648a08", "norm": true },
+  { "k": "bR", "id": "13dd9432-0238-417a-95d3-4ba6b268bb7d", "norm": true },
+  { "k": "bC", "id": "b5e0291b-46df-42cb-a48e-21e231c3bda2", "norm": true },
+  { "k": "bS", "id": "f3eb59c3-57e8-405b-8dff-e44814a28a60", "norm": true }
+]
