@@ -123,6 +123,6 @@ export const CONTROLS_MOBILE = [
 ];
 
 export const STAGE_LABELS = {
-  wizard: ['мастер', ''], generating: ['генерация', 'amber'], review: ['доработка', 'amber'],
+  wizard: ['мастер', ''], draft: ['черновик', ''], generating: ['генерация', 'amber'], review: ['доработка', 'amber'],
   final: ['финальная сборка', 'amber'], done: ['готова', 'green'], published: ['на модерации', 'violet'],
 };

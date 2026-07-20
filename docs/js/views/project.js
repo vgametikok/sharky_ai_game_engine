@@ -92,6 +92,14 @@ export default async function projectView([id]) {
     if (st.p.stage === 'final') runFinal();
   }
 
+  // Отложить проект в черновик (все поля уже в БД) и уйти в кабинет.
+  async function saveDraft() {
+    await save({ stage: 'draft' });
+    st.genError = null;
+    toast('Сохранено в черновик — найдёшь в кабинете');
+    location.hash = '#/cabinet';
+  }
+
   async function runInitialGeneration() {
     if (st.genBusy) return; st.genBusy = true;
     try {
@@ -211,12 +219,21 @@ export default async function projectView([id]) {
       st.ui.progress,
     );
 
+    if (st.p.stage === 'draft') { renderDraft(); return; }
+
     if (st.p.stage === 'generating') {
       root.append(h('div.panel', { style: 'margin-top:18px' },
         st.genError
           ? h('div', {},
               h('p', {}, '⚠ ' + st.genError),
-              h('button.btn.primary', { onclick: () => { st.genError = null; render(); runInitialGeneration(); } }, '↻ Попробовать ещё раз'))
+              h('p.hint', { style: 'margin:8px 0 0' },
+                'Проект уже сохранён — все поля на месте, открыть можно из кабинета в любой момент. ' +
+                'Чаще всего это провайдер: кончились кредиты или сработал лимит ключа. Смени провайдера/ключ в кабинете или попробуй позже.'),
+              h('div.row', { style: 'margin-top:14px; flex-wrap:wrap; gap:8px' },
+                h('button.btn.primary', { onclick: () => { st.genError = null; render(); runInitialGeneration(); } }, '↻ Попробовать ещё раз'),
+                h('button.btn.green', { onclick: saveDraft }, '💾 Сохранить в черновик'),
+                h('a.btn.ghost', { href: '#/cabinet' }, '← В кабинет'),
+              ))
           : h('div.typing', {}, `${st.p.provider} придумывает игру — это может занять пару минут`),
       ));
       return;
@@ -241,8 +258,37 @@ export default async function projectView([id]) {
     }
   }
 
+  // Экран черновика: показываем сохранённый бриф и даём запустить генерацию.
+  function renderDraft() {
+    const b = st.p.brief || {};
+    const g = GENRES.find(x => x.id === st.p.genre);
+    const line = (label, val) => val ? h('div', { style: 'margin:3px 0' }, h('b', {}, label + ': '), String(val)) : null;
+    root.append(h('div.panel', { style: 'margin-top:18px' },
+      h('h3', {}, '📝 Черновик'),
+      h('p.hint', {}, 'Проект сохранён со всеми полями. Генерация ещё не завершена — запусти её, когда будет рабочий провайдер (ключ добавляется в кабинете).'),
+      h('div', { style: 'margin:12px 0; color:var(--muted); font-size:14px' },
+        line('Жанр', g?.name || st.p.genre),
+        line('Назначение', st.p.target === 'sharky' ? 'для Sharky' : 'HTML-игра'),
+        line('Провайдер', st.p.provider || '— не выбран —'),
+        line('Лор', (b.lore || '').slice(0, 200)),
+      ),
+      h('div.row', { style: 'flex-wrap:wrap; gap:8px' },
+        h('button.btn.big.green', {
+          onclick: async () => {
+            if (!st.p.provider) { toast('сначала выбери провайдера и добавь ключ в кабинете', true); location.hash = '#/cabinet'; return; }
+            await save({ stage: 'generating', progress: 10 });
+            st.genError = null;
+            render(); kick();
+          },
+        }, '▶ Сгенерировать игру'),
+        h('a.btn.ghost', { href: '#/cabinet' }, '← В кабинет'),
+      ),
+    ));
+  }
+
   function progressLabel() {
     const s = st.p.stage;
+    if (s === 'draft') return 'черновик — генерация не запускалась';
     if (s === 'generating') return 'этап 1/3: генерация игры';
     if (s === 'review') return `этап 2/3: доработка — прототип ${st.p.proto_done ? '✓' : '…'} · ассеты ${st.p.assets_done ? '✓' : '…'}`;
     if (s === 'final') return 'этап 3/3: финальная сборка';

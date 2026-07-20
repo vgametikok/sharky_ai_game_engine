@@ -37,7 +37,14 @@ export default async function wizardView() {
         st.step > 0 ? h('button.btn', { onclick: () => { st.step--; render(); } }, '← Назад') : h('span'),
         st.step < STEPS.length - 1
           ? h('button.btn.primary', { disabled: !stepReady(), onclick: () => { st.step++; render(); } }, 'Дальше →')
-          : h('button.btn.big.green', { disabled: !stepReady(), onclick: start }, '▶ Начинаем делать игру'),
+          : h('div.row', { style: 'gap:8px' },
+              h('button.btn', { onclick: saveDraft }, '💾 Сохранить черновик'),
+              h('button.btn.big.green', {
+                disabled: !st.provider,
+                title: st.provider ? '' : 'нужен провайдер с ключом (добавь в кабинете) — или сохрани черновик',
+                onclick: start,
+              }, '▶ Начинаем делать игру'),
+            ),
       ),
     );
   }
@@ -48,7 +55,7 @@ export default async function wizardView() {
       case 1: return !!st.genre;
       case 2: return !!st.main;
       case 3: return st.pc && st.mobile;
-      case 4: return !!st.provider;
+      case 4: return true; // провайдер не обязателен: можно сохранить черновик и сгенерировать позже
       case 5: return true; // название/описание проверяет start()
     }
     return false;
@@ -141,6 +148,7 @@ export default async function wizardView() {
           }, h('h4', {}, p.name), h('p', {}, ok ? 'ключ подключён · модель по умолчанию: ' + p.model : 'ключ не задан'));
         })),
         h('p.hint', { style: 'margin-top:10px' }, 'Ассеты рисует PixelLab — его ключ тоже задаётся в кабинете.'),
+        h('p.hint', {}, 'Нет ключа? Шаг можно пропустить: заполни описание, нажми «Сохранить черновик» и сгенерируй позже.'),
       );
 
       case 5: {
@@ -196,23 +204,36 @@ export default async function wizardView() {
     return a;
   }
 
+  function projectFields() {
+    return {
+      title: st.title.trim(),
+      target: st.target,
+      orientation: st.orientation,
+      genre: st.genre,
+      mechanics: { main: st.main, extra: st.extra },
+      controls: { pc: st.pc, mobile: st.mobile },
+      brief: st.brief,
+      provider: st.provider,
+    };
+  }
+
   async function start() {
     if (!st.title.trim()) { toast('нужно название игры', true); return; }
     if (!st.brief.lore.trim()) { toast('опиши игру — это главный промпт', true); return; }
+    if (!st.provider) { toast('нет провайдера — добавь ключ в кабинете или сохрани черновик', true); return; }
     try {
-      const id = await createProject({
-        title: st.title.trim(),
-        target: st.target,
-        orientation: st.orientation,
-        genre: st.genre,
-        mechanics: { main: st.main, extra: st.extra },
-        controls: { pc: st.pc, mobile: st.mobile },
-        brief: st.brief,
-        provider: st.provider,
-        stage: 'generating',
-        progress: 10,
-      });
+      const id = await createProject({ ...projectFields(), stage: 'generating', progress: 10 });
       location.hash = '#/project/' + id;
+    } catch (e) { toast(e.message, true); }
+  }
+
+  // Черновик: сохраняем заполненные поля без генерации (провайдер/ключ не нужны).
+  async function saveDraft() {
+    if (!st.title.trim()) { toast('нужно название игры — по нему найдёшь черновик', true); return; }
+    try {
+      await createProject({ ...projectFields(), stage: 'draft', progress: 0 });
+      toast('Черновик сохранён — найдёшь в кабинете');
+      location.hash = '#/cabinet';
     } catch (e) { toast(e.message, true); }
   }
 }
