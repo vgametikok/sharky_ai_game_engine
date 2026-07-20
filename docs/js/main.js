@@ -5,6 +5,7 @@ import { signOut } from './auth.js';
 import loginView from './views/login.js';
 import cabinetView from './views/cabinet.js';
 import wizardView from './views/wizard.js';
+import importView from './views/import.js';
 import projectView from './views/project.js';
 import chatView from './views/chat.js';
 
@@ -15,6 +16,7 @@ const ROUTES = [
   [/^#\/login$/, loginView, false],
   [/^#\/cabinet$/, cabinetView, true],
   [/^#\/new$/, wizardView, true],
+  [/^#\/import$/, importView, true],
   [/^#\/project\/([0-9a-f-]{36})$/, projectView, true],
   [/^#\/chat$/, chatView, true],
 ];
@@ -33,6 +35,7 @@ function renderNav() {
   nav.append(
     link('#/cabinet', 'Кабинет'),
     link('#/new', '+ Игра'),
+    link('#/import', 'Из CONFIG'),
     link('#/chat', 'Чат'),
     h('span.who', {}, who),
     h('a', { href: '#', onclick: async (e) => { e.preventDefault(); await signOut(); location.hash = '#/login'; } }, 'Выйти'),

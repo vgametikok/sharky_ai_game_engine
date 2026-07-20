@@ -81,7 +81,10 @@ export default async function cabinetView() {
     h('div.grid.g2', { style: 'margin-bottom:16px' }, acc, keysPanel),
     h('div.row.spread', { style: 'margin:22px 0 12px' },
       h('h3', { style: 'margin:0; font-family:var(--mono); text-transform:uppercase' }, 'Мои игры'),
-      h('a.btn.primary', { href: '#/new' }, '+ Новая игра'),
+      h('div.row', { style: 'gap:8px' },
+        h('a.btn', { href: '#/import', title: 'вставить CONFIG, сгенерированный Claude' }, '📋 Из CONFIG'),
+        h('a.btn.primary', { href: '#/new' }, '+ Новая игра'),
+      ),
     ),
     projList,
   );
