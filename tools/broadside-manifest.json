@@ -1,0 +1,16 @@
+[
+  { "k": "ship",        "url": "https://api.pixellab.ai/mcp/map-objects/cf7c7a3d-c76c-4644-9d65-375c1aeefaa7/download", "mode": "center" },
+  { "k": "e_sloop",     "url": "https://backblaze.pixellab.ai/file/pixellab-characters/objects/6a405a9b-fa75-4e82-9b84-e39943e65050/d513d857-f575-4632-9fa9-29b783fae19b/rotations/unknown.png", "mode": "center" },
+  { "k": "e_gunboat",   "url": "https://backblaze.pixellab.ai/file/pixellab-characters/objects/6a405a9b-fa75-4e82-9b84-e39943e65050/8d6606eb-410b-47bb-ae6f-b5a97c483d74/rotations/unknown.png", "mode": "center" },
+  { "k": "e_canoe",     "url": "https://backblaze.pixellab.ai/file/pixellab-characters/objects/6a405a9b-fa75-4e82-9b84-e39943e65050/3e0207b8-b6b4-4a07-92a0-7a2fcc9465c1/rotations/unknown.png", "mode": "center" },
+  { "k": "e_fire",      "url": "https://backblaze.pixellab.ai/file/pixellab-characters/objects/6a405a9b-fa75-4e82-9b84-e39943e65050/59ea61b3-3e38-4699-9971-baeca0f37f13/rotations/unknown.png", "mode": "center" },
+  { "k": "e_ghost",     "url": "https://backblaze.pixellab.ai/file/pixellab-characters/objects/6a405a9b-fa75-4e82-9b84-e39943e65050/9c2cf185-c210-4a32-8a6a-539b3ebb4b0b/rotations/unknown.png", "mode": "center" },
+  { "k": "e_mine",      "url": "https://backblaze.pixellab.ai/file/pixellab-characters/objects/6a405a9b-fa75-4e82-9b84-e39943e65050/b090a5da-ed90-48ec-ad48-ded24f5012a6/rotations/unknown.png", "mode": "center" },
+  { "k": "e_serpent",   "url": "https://backblaze.pixellab.ai/file/pixellab-characters/objects/6a405a9b-fa75-4e82-9b84-e39943e65050/df715b62-f728-4409-994e-a8049596cb08/rotations/unknown.png", "mode": "center" },
+  { "k": "e_crab",      "url": "https://backblaze.pixellab.ai/file/pixellab-characters/objects/6a405a9b-fa75-4e82-9b84-e39943e65050/4af1a2a3-1fa4-407e-80c4-db24485a207a/rotations/unknown.png", "mode": "center" },
+  { "k": "b_wreck",     "url": "https://backblaze.pixellab.ai/file/pixellab-characters/objects/6a405a9b-fa75-4e82-9b84-e39943e65050/d4803673-e666-4dab-95a1-8dc173064b6c/rotations/unknown.png", "mode": "center" },
+  { "k": "b_frigate",   "url": "https://backblaze.pixellab.ai/file/pixellab-characters/objects/6a405a9b-fa75-4e82-9b84-e39943e65050/7a0b8a02-419f-4af2-9285-7251ae7fa6f2/rotations/unknown.png", "mode": "center" },
+  { "k": "b_kraken",    "url": "https://backblaze.pixellab.ai/file/pixellab-characters/objects/6a405a9b-fa75-4e82-9b84-e39943e65050/3ad256b7-e5b3-4959-a9b0-77996219018e/rotations/unknown.png", "mode": "center" },
+  { "k": "b_ironclad",  "url": "https://backblaze.pixellab.ai/file/pixellab-characters/objects/6a405a9b-fa75-4e82-9b84-e39943e65050/83094f76-d285-4090-91ae-8ad7d15b9c2a/rotations/unknown.png", "mode": "center" },
+  { "k": "b_leviathan", "url": "https://backblaze.pixellab.ai/file/pixellab-characters/objects/6a405a9b-fa75-4e82-9b84-e39943e65050/4b633219-2895-46b2-906f-d33598c47d86/rotations/unknown.png", "mode": "center" }
+]

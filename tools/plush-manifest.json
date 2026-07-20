@@ -1,0 +1,10 @@
+[
+  { "k": "pl_bunny",   "url": "https://backblaze.pixellab.ai/file/pixellab-characters/objects/6a405a9b-fa75-4e82-9b84-e39943e65050/307c2a4a-3feb-4a78-a8de-8437a7f3f381/rotations/unknown.png", "mode": "center", "max": 96 },
+  { "k": "pl_cat",     "url": "https://backblaze.pixellab.ai/file/pixellab-characters/objects/6a405a9b-fa75-4e82-9b84-e39943e65050/e4ec93d5-2b9e-46c2-9025-455d264d8371/rotations/unknown.png", "mode": "center", "max": 96 },
+  { "k": "pl_goblin",  "url": "https://backblaze.pixellab.ai/file/pixellab-characters/objects/6a405a9b-fa75-4e82-9b84-e39943e65050/7d4395db-9214-413a-937d-c3b8e5485e38/rotations/unknown.png", "mode": "center", "max": 96 },
+  { "k": "pl_star",    "url": "https://backblaze.pixellab.ai/file/pixellab-characters/objects/6a405a9b-fa75-4e82-9b84-e39943e65050/ec179279-7808-4e00-a8f2-2af3d0300ae0/rotations/unknown.png", "mode": "center", "max": 96 },
+  { "k": "pl_axolotl", "url": "https://backblaze.pixellab.ai/file/pixellab-characters/objects/6a405a9b-fa75-4e82-9b84-e39943e65050/f1b09114-758c-4ced-a12f-305c227e7e10/rotations/unknown.png", "mode": "center", "max": 96 },
+  { "k": "pl_fox",     "url": "https://backblaze.pixellab.ai/file/pixellab-characters/objects/6a405a9b-fa75-4e82-9b84-e39943e65050/0a49542e-73d8-4014-b8ad-9787af5600e8/rotations/unknown.png", "mode": "center", "max": 96 },
+  { "k": "pl_ghost",   "url": "https://backblaze.pixellab.ai/file/pixellab-characters/objects/6a405a9b-fa75-4e82-9b84-e39943e65050/5817efac-4002-4543-8054-00808a458b58/rotations/unknown.png", "mode": "center", "max": 96 },
+  { "k": "pl_dragon",  "url": "https://backblaze.pixellab.ai/file/pixellab-characters/objects/6a405a9b-fa75-4e82-9b84-e39943e65050/06f11048-5501-4dc7-bbca-7a1d5338666d/rotations/unknown.png", "mode": "center", "max": 96 }
+]
