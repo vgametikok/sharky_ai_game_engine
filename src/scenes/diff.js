@@ -7,15 +7,19 @@
 
    CONFIG.diff = {
      imgA/imgB: имена ассетов ИЛИ процедурная сцена (по умолчанию),
+     imgs: ['prop1','prop2',…],           — сцена из СПРАЙТОВ вместо фигур
+     bgColor: '#1c2434',                  — фон половинок
      shapes: 26, diffs: 6,                — генерация: фигуры и отличия
      penalty: 3,                          — штраф секунды за промах
      rounds: 3                            — раундов (новая сцена каждый)
    }
+   Отличия у спрайтов: 0=перекрашен (hue-rotate), 1=крупнее, 2=повёрнут, 3=исчез.
    ============================================================ */
 Engine.register('diff', function (engine, cfg) {
   'use strict';
   const DC = cfg.diff || {};
   const FONT = (cfg.theme && cfg.theme.font) || 'sans-serif';
+  const LB = (cfg.theme && cfg.theme.labels) || {};
   const PEN = DC.penalty == null ? 3 : DC.penalty;
   const NDIFF = DC.diffs || 6;
 
@@ -25,13 +29,16 @@ Engine.register('diff', function (engine, cfg) {
   let seed = 7;
   function rnd() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
 
+  const IMGS = DC.imgs || null;          // сцена из спрайтов вместо процедурных фигур
+
   // генерация сцены: фигуры одинаковые в A и B, кроме diffs (изменён цвет/размер/поворот/нет)
   function genScene() {
     shapes = []; diffs = []; foundN = 0;
     const n = DC.shapes || 26;
     for (let i = 0; i < n; i++) {
       shapes.push({ x: 0.06 + rnd() * 0.88, y: 0.08 + rnd() * 0.84, r: 9 + rnd() * 18,
-        hue: (rnd() * 360) | 0, rot: rnd() * 6.28, kind: (rnd() * 4) | 0 });
+        hue: (rnd() * 360) | 0, rot: IMGS ? (rnd() - 0.5) * 1.1 : rnd() * 6.28, kind: (rnd() * 4) | 0,
+        img: IMGS ? IMGS[(rnd() * IMGS.length) | 0] : null });
     }
     const idx = [];
     while (idx.length < Math.min(NDIFF, n)) { const k = (rnd() * n) | 0; if (idx.indexOf(k) === -1) idx.push(k); }
@@ -42,19 +49,28 @@ Engine.register('diff', function (engine, cfg) {
   }
   function drawScene(ctx, x0, y0, w, h, isB) {
     ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, w, h); ctx.clip();
-    ctx.fillStyle = '#1c2434'; ctx.fillRect(x0, y0, w, h);
+    ctx.fillStyle = DC.bgColor || '#1c2434'; ctx.fillRect(x0, y0, w, h);
     for (let i = 0; i < shapes.length; i++) {
       const s = shapes[i];
-      let hue = s.hue, r = s.r, rot = s.rot, skip = false;
+      let hue = s.hue, r = s.r, rot = s.rot, skip = false, hueMod = false;
       if (isB) {
         for (let d = 0; d < diffs.length; d++) if (diffs[d].i === i) {
-          if (diffs[d].mod === 0) hue = (hue + 140) % 360;
+          if (diffs[d].mod === 0) { hue = (hue + 140) % 360; hueMod = true; }
           else if (diffs[d].mod === 1) r *= 1.6;
           else if (diffs[d].mod === 2) rot += 1.2;
           else skip = true;
         }
       }
       if (skip) continue;
+      const im = s.img && engine.img(s.img);
+      if (im && im.complete && im.naturalWidth) {
+        ctx.save(); ctx.translate(x0 + s.x * w, y0 + s.y * h); ctx.rotate(rot);
+        ctx.imageSmoothingEnabled = false;
+        if (hueMod) ctx.filter = 'hue-rotate(140deg) saturate(1.6)';
+        ctx.drawImage(im, -r, -r, r * 2, r * 2);
+        ctx.restore();
+        continue;
+      }
       ctx.save(); ctx.translate(x0 + s.x * w, y0 + s.y * h); ctx.rotate(rot);
       ctx.fillStyle = 'hsl(' + hue + ',60%,55%)';
       if (s.kind === 0) ctx.fillRect(-r, -r * 0.7, r * 2, r * 1.4);
@@ -102,9 +118,9 @@ Engine.register('diff', function (engine, cfg) {
     hud: function (ctx) {
       ctx.font = 'bold 15px ' + FONT; ctx.textBaseline = 'top';
       ctx.fillStyle = '#fff'; ctx.textAlign = 'left';
-      ctx.fillText('Раунд ' + (round + 1) + ' · ' + foundN + '/' + diffs.length, 12, 12);
+      ctx.fillText((LB.roundWord || 'Раунд') + ' ' + (round + 1) + ' · ' + foundN + '/' + diffs.length, 12, 12);
       ctx.fillStyle = engine.timeLeft < 10 ? '#e0533d' : '#ffd75e'; ctx.textAlign = 'right';
-      ctx.fillText(Math.ceil(engine.timeLeft) + ' с · ' + engine.score, W - 12, 12);
+      ctx.fillText(Math.ceil(engine.timeLeft) + ' ' + (LB.secWord || 'с') + ' · ' + engine.score, W - 12, 12);
     },
 
     pointerDown: function (p) {

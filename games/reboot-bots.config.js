@@ -13,7 +13,7 @@ const img = (n) => (px[n] ? n : undefined);
 
 module.exports = {
   genre: 'puzzle',
-  meta: { title: 'Перезагрузка' },
+  meta: { title: 'Reboot' },
   assets: px,
   theme: {
     accent: '#1de0c0',
@@ -22,11 +22,12 @@ module.exports = {
     hudText: '#bfeaff',
     font: "'Segoe UI', system-ui, sans-serif",
     labels: {
-      over: 'ПИТАНИЕ СЕЛО…',
-      win: 'КЛАСТЕР ОНЛАЙН!',
-      again: 'Тап — новая смена',
-      scoreUnit: 'очков',
-      hint: 'Свайп — шаг · кати модули на зарядки · ↶ отмена',
+      over: 'POWER LOST…',
+      win: 'CLUSTER ONLINE!',
+      again: 'Tap for a new shift',
+      scoreUnit: 'points',
+      hint: 'Swipe to step · push pods onto pads · ↶ undo',
+      level: 'Hall', movesLeft: 'Moves', movesDone: 'Moves', cleared: 'Hall cleared!',
     },
   },
   rules: { mode: 'untimed' },

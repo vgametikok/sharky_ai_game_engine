@@ -37,6 +37,7 @@ Engine.register('shmup', function (engine, cfg) {
   const ENEMIES = S.enemies || {};
   const WAVES = S.waves || [];
   const LOOP = Object.assign({ hpMul: 1.3, rateMul: 0.9 }, S.loop || {});
+  const SPOT = S.spotlight || null;      // {radius,dark}: тьма + круг света вокруг игрока (глубина/ночь)
   const LB = (cfg.theme && cfg.theme.labels) || {};
   const FONT = (cfg.theme && cfg.theme.font) || 'sans-serif';
 
@@ -88,8 +89,8 @@ Engine.register('shmup', function (engine, cfg) {
     if (level >= LVL_COUNT) { engine.gameOver({ label: (LB.win || 'МИР СПАСЁН!') }); return; }
     const wasBoss = isBossLevel(level - 1);
     if (isBossLevel(level)) { const nb = bossOf(level); interLines = ['⚠ ' + (nb.name || 'БОСС'), nb.story || '']; interT = 3.4; }
-    else if (wasBoss) { const pb2 = bossOf(level - 1); interLines = [(pb2.name || 'Босс') + ' повержен', pb2.win || '']; interT = 3.2; }
-    else { interLines = ['УРОВЕНЬ ' + (level + 1)]; interT = 1.3; }
+    else if (wasBoss) { const pb2 = bossOf(level - 1); interLines = [(pb2.name || 'Босс') + ' ' + (LB.defeated || 'повержен'), pb2.win || '']; interT = 3.2; }
+    else { interLines = [(LB.levelWord || 'УРОВЕНЬ') + ' ' + (level + 1)]; interT = 1.3; }
     buildLevel(level);
   }
   function sprOf(def, ent) {
@@ -129,7 +130,7 @@ Engine.register('shmup', function (engine, cfg) {
       buildLevel(level);
       if (level === 0 && INTRO) { interLines = INTRO; interT = 4.0; }
       else if (isBossLevel(level)) { const nb = bossOf(level); interLines = ['⚠ ' + (nb.name || 'БОСС'), nb.story || '']; interT = 3.0; }
-      else { interLines = ['УРОВЕНЬ ' + (level + 1)]; interT = 1.1; }
+      else { interLines = [(LB.levelWord || 'УРОВЕНЬ') + ' ' + (level + 1)]; interT = 1.1; }
     }
   }
   function layoutButtons() {
@@ -162,9 +163,23 @@ Engine.register('shmup', function (engine, cfg) {
 
   function fireWeapon() {
     const lv = LEVELS[Math.min(p.lvl, LEVELS.length - 1)];
+    // вперёд (нос) — веер по spread
     for (let i = 0; i < lv.count; i++) {
       const a = -Math.PI / 2 + (lv.count > 1 ? (i - (lv.count - 1) / 2) * (lv.spread / Math.max(1, lv.count - 1)) : 0);
       pb.push({ x: p.x, y: p.y - PL.h * 0.4, vx: Math.cos(a) * WPN.shotSpeed, vy: Math.sin(a) * WPN.shotSpeed, dmg: lv.dmg });
+    }
+    // БОРТОВОЙ ЗАЛП: пушки с обоих бортов (weapon.sides) — по уровню оружия число стволов растёт
+    if (WPN.sides) {
+      const sc = Math.max(1, Math.min(lv.count, WPN.sideMax || 3));
+      const sp = (WPN.sideSpeed || WPN.shotSpeed);
+      for (let s = 0; s < 2; s++) {
+        const baseA = s === 0 ? 0 : Math.PI;                 // правый борт / левый борт
+        for (let i = 0; i < sc; i++) {
+          const off = (sc > 1 ? (i - (sc - 1) / 2) : 0) * 0.16;
+          const a = baseA + off;
+          pb.push({ x: p.x + (s === 0 ? PL.w * 0.42 : -PL.w * 0.42), y: p.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, dmg: lv.dmg });
+        }
+      }
     }
     engine.beep(760, 0.04, 'square', 0.06);
   }
@@ -344,6 +359,22 @@ Engine.register('shmup', function (engine, cfg) {
         if (POLAR) { ctx.fillStyle = PCOL[f.pol]; ctx.beginPath(); ctx.arc(f.x, f.y, 4, 0, 7); ctx.fill(); }
         if (f.boss) drawBossBar(ctx, f);
       });
+      // фонарь: тьма с кругом света вокруг игрока; враги на границе едва проглядывают
+      if (SPOT) {
+        const r0 = SPOT.radius || 170;
+        const dk = SPOT.dark == null ? 0.86 : SPOT.dark;
+        const g = ctx.createRadialGradient(p.x, p.y, r0 * 0.4, p.x, p.y, r0);
+        g.addColorStop(0, 'rgba(2,4,14,0)');
+        g.addColorStop(1, 'rgba(2,4,14,' + dk + ')');
+        ctx.fillStyle = g; ctx.fillRect(-10, 0, W + 20, H);
+        // биолюминесценция пикапов — светятся сквозь тьму
+        drops.forEach(d => {
+          const bob = Math.sin(d.t * 5) * 2;
+          const gg = ctx.createRadialGradient(d.x, d.y + bob, 1, d.x, d.y + bob, 16);
+          gg.addColorStop(0, 'rgba(140,220,255,0.85)'); gg.addColorStop(1, 'rgba(140,220,255,0)');
+          ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(d.x, d.y + bob, 16, 0, 7); ctx.fill();
+        });
+      }
       // пули игрока (спрайт пули, если задан)
       const bim = WPN.bulletImg && engine.img(WPN.bulletImg);
       if (bim) pb.forEach(b => { const s = WPN.bulletSize || 14; ctx.drawImage(bim, b.x - s / 2, b.y - s / 2, s, s); });
@@ -390,7 +421,7 @@ Engine.register('shmup', function (engine, cfg) {
       // уровень оружия + прогресс кампании / круг
       ctx.font = 'bold 11px ' + FONT;
       ctx.fillStyle = 'rgba(255,255,255,0.75)';
-      const prog = MODE === 'levels' ? '  УР ' + (level + 1) + '/' + LVL_COUNT : (loopN ? '  ЦИКЛ ' + (loopN + 1) : '');
+      const prog = MODE === 'levels' ? '  ' + (LB.lvlShort || 'УР') + ' ' + (level + 1) + '/' + LVL_COUNT : (loopN ? '  ' + (LB.loopWord || 'ЦИКЛ') + ' ' + (loopN + 1) : '');
       ctx.fillText('PWR ' + (p.lvl + 1) + prog, W - 14, 40);
       // кнопки
       btns.forEach(b => {

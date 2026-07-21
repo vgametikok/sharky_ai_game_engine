@@ -1,40 +1,41 @@
-/* «БОРТОВОЙ ЗАЛП» — вертикальный шмап-кампания на воде (сцена shmup, режим levels).
-   ЛОР: капитан Мару выходит в проклятые воды Семи Печатей за картой Кровавой Луны.
-   Навстречу — вражеские шлюпы, брандеры, канонерки и морские твари, а каждые пять
-   рубежей путь стережёт капитан-легенда. 30 рубежей, босс каждые 5, прогресс копится.
-
-   Единственная морская игра набора. Спрайты: PixelLab (корабль игрока, 8 врагов,
-   боссы) из broadside.px.js + процедурный фон/ядро из broadside.proc.js. */
+/* «BROADSIDE» — вертикальный морской шмап-кампания (сцена shmup, режим levels).
+   Отличие от прочих шмапов: корабль идёт по ОТКРЫТОМУ МОРЮ (полностью водный фон)
+   и палит ПУШКАМИ С ОБОИХ БОРТОВ (weapon.sides) — плюс нос вперёд. На него идут
+   вражеские корабли и морские твари. 30 рубежей, босс каждые 5, прогресс копится.
+   Единственная морская игра набора. Спрайты — PixelLab (broadside.px.js) + фон/ядро
+   процедурные (broadside.proc.js). */
 'use strict';
-let px = {}; try { px = Object.assign({}, require('./broadside.proc.js')); } catch (e) { /* до генерации */ }
-try { Object.assign(px, require('./broadside.px.js')); } catch (e) { /* до упаковки PixelLab */ }
+let px = {}; try { px = Object.assign({}, require('./broadside.proc.js')); } catch (e) {}
+try { Object.assign(px, require('./broadside.px.js')); } catch (e) {}
 const assets = px;
 const img = (n) => (assets[n] ? n : undefined);
 
 module.exports = {
   genre: 'shmup',
-  meta: { title: 'Бортовой Залп' },
+  meta: { title: 'Broadside' },
   assets: assets,
   theme: {
     accent: '#ffcf6a',
-    bgTop: '#0e1430', bgBottom: '#05070f',
+    bgTop: '#0e3a52', bgBottom: '#06283c',
     bgImage: img('bs_sea'),
     font: "'Segoe UI', system-ui, sans-serif",
     labels: {
-      over: 'КОРАБЛЬ ПОШЁЛ КО ДНУ',
-      win: 'КАРТА КРОВАВОЙ ЛУНЫ ТВОЯ!',
-      again: 'Тап — снова в поход',
-      scoreUnit: 'дублонов',
-      hint: 'Веди пальцем · ✦ картечь очищает воду',
+      over: 'SUNK!',
+      win: 'THE BLOOD MOON MAP IS YOURS!',
+      again: 'Tap to set sail again',
+      scoreUnit: 'doubloons',
+      hint: 'Drag to steer · cannons fire BOTH sides · ✦ grapeshot',
+      defeated: 'sunk', levelWord: 'WAVE', lvlShort: 'W',
     },
   },
   rules: { mode: 'untimed' },
   shmup: {
     mode: 'levels', levelCount: 30, bossEvery: 5,
-    scroll: { speed: 46, stars: true },
+    scroll: { speed: 60, stars: true },
     player: { w: 30, h: 40, speed: 300, hp: 3, bombs: 3, hitboxR: 4, color: '#ffcf6a', img: img('ship'), imgScale: 1.5 },
     weapon: {
-      cooldown: 0.15, shotSpeed: 470, bulletImg: img('bs_ball'), bulletSize: 16,
+      cooldown: 0.16, shotSpeed: 470, bulletImg: img('bs_ball'), bulletSize: 16,
+      sides: true, sideMax: 3, sideSpeed: 420,     // БОРТОВОЙ ЗАЛП: пушки с обоих бортов
       levels: [
         { count: 1, spread: 0, dmg: 1 },
         { count: 2, spread: 0.12, dmg: 1 },
@@ -43,9 +44,8 @@ module.exports = {
         { count: 5, spread: 0.56, dmg: 2 },
       ],
     },
-    intro: ['БОРТОВОЙ ЗАЛП',
-      'Проклятые воды Семи Печатей ведут к карте Кровавой Луны. Дай залп — и держи курс на легенду.'],
-    // ── 8 врагов-рядовых ──
+    intro: ['BROADSIDE',
+      'Cursed waters guard the Blood Moon map. Fire a broadside from both rails — and hold your course.'],
     pool: ['sloop', 'gunboat', 'canoe', 'fire', 'ghost', 'mine', 'serpent', 'crab'],
     enemies: {
       sloop:   { w: 30, h: 32, hp: 2, speed: 72, color: '#c9b48a', move: 'straight', img: img('e_sloop'),   imgScale: 1.55, score: 40, drop: 'up',   dropChance: 0.10 },
@@ -65,12 +65,12 @@ module.exports = {
       b_leviathan: { w: 84, h: 80, hp: 280, speed: 16, color: '#3a6a8a', move: 'hover', img: img('b_leviathan'), imgScale: 1.6, gun: { cooldown: 0.55, speed: 185, aim: 'player' }, score: 5000, drop: 'heart', dropChance: 1 },
     },
     bosses: [
-      { enemy: 'b_capt',      name: 'КАПИТАН ЧЁРНЫЙ УС',   story: 'Его фрегат не знал промаха тридцать лет. Первая печать за ним.',       win: 'Чёрный Ус отдал штурвал. Первая печать сломана.' },
-      { enemy: 'b_ghostship', name: 'КОРАБЛЬ-ПРИЗРАК',      story: 'Команда мертвецов гребёт сквозь туман и не тонет.',                    win: 'Туман рассеялся, призраки обрели покой на дне.' },
-      { enemy: 'b_ironclad',  name: 'БРОНЕНОСЕЦ «УТЮГ»',     story: 'Железная громада не берёт ни ядро, ни абордаж. Только упорство.',       win: 'Швы брони разошлись — «Утюг» затонул в кипящей пене.' },
-      { enemy: 'b_serpking',  name: 'ЦАРЬ-ЗМЕЙ ГЛУБИН',      story: 'Морской змей длиной в милю обвивает корабли и тянет вниз.',             win: 'Кольца разжались. Змей ушёл в бездну зализывать раны.' },
-      { enemy: 'b_kraken',    name: 'КРАКЕН',                story: 'Восемь щупалец подняли из пучины саму тьму. Держись, капитан.',         win: 'Кракен отступил в глубину. Шестая печать пала.' },
-      { enemy: 'b_leviathan', name: 'ЛЕВИАФАН КРОВАВОЙ ЛУНЫ', story: 'Последний страж карты. Тот, кого рисуют на краю всех карт.',           win: 'Левиафан низвергнут. Карта Кровавой Луны — в твоих руках, капитан!' },
+      { enemy: 'b_capt',      name: 'CAPTAIN BLACKBEARD', story: 'His frigate has not missed a shot in thirty years. The first seal is his.', win: 'Blackbeard yields the helm. The first seal is broken.' },
+      { enemy: 'b_ghostship', name: 'THE GHOST GALLEON',   story: 'A crew of the dead rows through the fog and will not sink.',            win: 'The fog lifts. The ghosts find rest on the seabed.' },
+      { enemy: 'b_ironclad',  name: 'IRONSIDES',           story: 'An iron behemoth — neither cannonball nor boarding will crack it.',      win: 'Her seams split — Ironsides went down in the boiling foam.' },
+      { enemy: 'b_serpking',  name: 'THE SERPENT KING',    story: 'A sea serpent a mile long coils around ships and drags them under.',     win: 'The coils loosen. The serpent slinks back to the deep.' },
+      { enemy: 'b_kraken',    name: 'THE KRAKEN',          story: 'Eight tentacles raise the darkness itself from the abyss.',              win: 'The Kraken retreats into the depths. Six seals fallen.' },
+      { enemy: 'b_leviathan', name: 'LEVIATHAN OF THE BLOOD MOON', story: 'The last guardian — the one drawn at the edge of every map.',   win: 'Leviathan is cast down. The Blood Moon map is yours, Captain!' },
     ],
   },
 };

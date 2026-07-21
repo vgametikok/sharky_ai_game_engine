@@ -67,7 +67,7 @@ function buildTower() {
 
 module.exports = {
   genre: 'platformer',
-  meta: { title: 'На Марс' },
+  meta: { title: 'Mars or Bust' },
   assets: px,
   theme: {
     accent: '#ffb04a',
@@ -75,7 +75,7 @@ module.exports = {
     bgImage: img('mb_bg'),
     hudText: '#ffe3c0',
     font: "'Segoe UI', system-ui, sans-serif",
-    labels: { over: 'ПОТЕРЯН В КОСМОСЕ', win: 'МЫ НА МАРСЕ!', again: 'Тап — новый запуск', scoreUnit: 'DOGE', level: 'Ярус' },
+    labels: { over: 'LOST IN SPACE', win: 'WE MADE IT TO MARS!', again: 'Tap to launch again', scoreUnit: 'DOGE', level: 'Tier' },
   },
   rules: { mode: 'untimed' },
   platformer: {
